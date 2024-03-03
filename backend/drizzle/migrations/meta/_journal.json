@@ -1,0 +1,13 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1709273931662,
+      "tag": "0000_thin_sumo",
+      "breakpoints": true
+    }
+  ]
+}
