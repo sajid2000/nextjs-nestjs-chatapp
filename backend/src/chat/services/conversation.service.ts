@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 
 import { UserService } from "@/user/services/user.service";
 
@@ -13,54 +13,83 @@ export class ConversationService {
     private conversationRepository: ConversationRepository
   ) {}
 
-  async createConversation(dto: CreateConversationDto & { userId: number }) {
-    const conversationExist = await this.conversationRepository.getConversationOfTwoUser(dto.userId, dto.contactId);
+  async createGroupConversation(dto: { members: number[] }) {
+    const conversation = (await this.conversationRepository.createGroupConversation())[0];
 
-    if (conversationExist) throw new ConflictException("Conversation already exists!");
+    if (!conversation) throw new UnprocessableEntityException();
 
-    return this.conversationRepository.createConversation(dto);
+    await this.conversationRepository.createManyUserConversation(conversation.id, dto.members);
+
+    return conversation;
+  }
+
+  async createOrGetPrivateConversation(dto: CreateConversationDto & { userId: number }) {
+    const exists = await this.conversationRepository.getConversationOfTwoUser(dto.userId, dto.contactId);
+
+    if (exists) return exists;
+
+    return this.conversationRepository.createPrivateConversation(dto);
   }
 
   async getUserConversationThreads(userId: number) {
-    const res = await this.conversationRepository.getUserConversationThread(userId);
+    const privateConversations = await this.conversationRepository.getUserPrivateConversations(userId);
 
-    return res.map(
-      ({
-        id,
-        name,
-        avatar,
-        isGroup,
-        isOnline,
-        participantId,
-        lastSeen,
-        lastMessageContent,
-        lastMessageId,
-        lastMessageSenderId,
-        lastMessageSentDate,
-        lastMessageStatus,
-        lastMessageType,
-        lastMessageDeletedAt,
-      }) =>
-        new ChatThreadEntity({
-          id,
-          name,
-          avatar,
-          isGroup,
-          isOnline,
-          participantOrGroupId: participantId,
-          lastSeen,
-          isDeleted: false,
-          lastMessage: {
-            id: lastMessageId,
-            messageContent: lastMessageContent,
-            senderId: lastMessageSenderId,
-            messageStatus: lastMessageStatus,
-            messageType: lastMessageType,
-            sentDate: lastMessageSentDate,
-            deleteAt: lastMessageDeletedAt,
-          },
-        })
-    );
+    const groupConversation = await this.conversationRepository.getUserGroupConversationList(userId);
+
+    const groupChat = groupConversation.map(({ group }) => {
+      const lastMessage = group.conversation.messages[0];
+      return new ChatThreadEntity({
+        id: group.conversation.id,
+        name: group.name,
+        avatar: group.image,
+        isGroup: true,
+        isDeleted: false,
+        isOnline: false,
+        lastSeen: new Date(),
+        participantOrGroupId: group.id,
+        lastMessage: lastMessage
+          ? {
+              id: lastMessage.id,
+              senderId: lastMessage.senderId,
+              messageContent: lastMessage.messageContent,
+              messageStatus: lastMessage.messageStatus,
+              messageType: lastMessage.messageType,
+              sentDate: lastMessage.sentDate,
+              deleteAt: lastMessage.deleteAt,
+            }
+          : undefined,
+      });
+    });
+
+    const privateChat = privateConversations.map((i) => {
+      return new ChatThreadEntity({
+        id: i.id,
+        name: i.name,
+        avatar: i.avatar,
+        isGroup: i.isGroup,
+        isDeleted: false,
+        isOnline: i.isOnline,
+        lastSeen: new Date(i.lastSeen),
+        participantOrGroupId: i.participantId,
+        lastMessage: {
+          id: i.lastMessageId,
+          messageContent: i.lastMessageContent,
+          senderId: i.lastMessageSenderId,
+          messageStatus: i.lastMessageStatus,
+          messageType: i.lastMessageType,
+          sentDate: new Date(i.lastMessageSentDate),
+          deleteAt: i.lastMessageDeletedAt,
+        },
+      });
+    });
+
+    return [...groupChat, ...privateChat].sort((a, b) => {
+      if (a.lastMessage && b.lastMessage) {
+        return new Date(b.lastMessage.sentDate).getTime() - new Date(a.lastMessage.sentDate).getTime();
+      }
+
+      return a.id - b.id;
+    });
   }
 
   async getUserConversationList(userId: number) {
@@ -73,13 +102,17 @@ export class ConversationService {
     if (!res) throw new NotFoundException("Conversation not found!");
 
     if (res.conversation.isGroup) {
+      const group = await this.conversationRepository.getConversationGroup(res.conversation.id);
+
+      if (!group) throw new NotFoundException();
+
       return new ConversationEntity({
         id: res.conversation.id,
         isGroup: true,
-        name: "group name",
-        avatar: "group avatar",
-        isDeleted: res.isDeleted,
-        participantOrGroupId: 0,
+        name: group.name,
+        avatar: group.image,
+        isDeleted: false,
+        participantOrGroupId: group.id,
         isOnline: false,
         lastSeen: new Date(),
       });
@@ -120,6 +153,6 @@ export class ConversationService {
 
     if (!res) throw new NotFoundException("Conversation not found!");
 
-    if (res.isDeleted) await this.conversationRepository.addUserToConversation(dto);
+    if (res.isDeleted) await this.conversationRepository.updateUserConversation({ ...dto, isDeleted: false });
   }
 }

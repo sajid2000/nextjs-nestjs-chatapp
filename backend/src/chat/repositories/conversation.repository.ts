@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, inArray, not, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, not, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { DB, DB_CONNECTION } from "@/db/db.module";
@@ -11,12 +11,16 @@ import { ConversationList } from "../types";
 export class ConversationRepository {
   constructor(@Inject(DB_CONNECTION) private db: DB) {}
 
-  async createConversation(data: { userId: number; contactId: number; isGroup: boolean }) {
-    const { userId, contactId, isGroup } = data;
+  async createGroupConversation() {
+    return this.db.insert(dbTable.conversation).values({ isGroup: true }).returning();
+  }
+
+  async createPrivateConversation(data: { userId: number; contactId: number }) {
+    const { userId, contactId } = data;
 
     return await this.db.transaction(async (tx) => {
       try {
-        const newConversation = (await tx.insert(dbTable.conversation).values({ isGroup }).returning())[0];
+        const newConversation = (await tx.insert(dbTable.conversation).values({ isGroup: false }).returning())[0];
 
         // insert data to "userConversation" junction table
         await tx.insert(dbTable.userConversation).values([
@@ -27,11 +31,13 @@ export class ConversationRepository {
         return newConversation;
       } catch (error) {
         await tx.rollback();
+
+        throw error;
       }
     });
   }
 
-  async getUserConversationThread(userId: number) {
+  async getUserPrivateConversations(userId: number) {
     /*
       select
         c.id, c.is_group
@@ -39,7 +45,7 @@ export class ConversationRepository {
         , m.id as last_message_id, m.message_content as last_message, m.sender_id as last_message_sender_id
         , m.message_type, m.message_status, m.sent_date as message_sent_date
       from conversation as c
-        inner join user_conversation as uc on uc.conversation_id = c.id and uc.user_id != 1
+        inner join user_conversation as uc on uc.conversation_id = c.id and uc.user_id != 1 and c.isGroup = false
         inner join "user" as u on u.id = uc.user_id
         left join lateral (
           select * from "message" where conversation_id = c.id order by id desc limit 1
@@ -51,7 +57,6 @@ export class ConversationRepository {
       )
       order by c.id desc
     */
-
     const u = alias(dbTable.user, "u");
     const m = alias(dbTable.message, "m");
     const c = alias(dbTable.conversation, "c");
@@ -65,7 +70,7 @@ export class ConversationRepository {
       ${m.messageStatus} "lastMessageStatus", ${m.sentDate} as "lastMessageSentDate", ${m.deleteAt} as "lastMessageDeletedAt"
     from ${dbTable.conversation} as ${c}
       inner join ${dbTable.userConversation} as ${uc}
-        on ${uc.conversationId} = ${c.id} and ${uc.userId} != ${userId}
+        on ${uc.conversationId} = ${c.id} and ${uc.userId} != ${userId} and ${c.isGroup} = false
       inner join ${dbTable.user} as ${u} on ${u.id} = ${uc.userId}
       left join lateral (
         select * from ${dbTable.message} where ${dbTable.message.conversationId} = ${c.id} order by id desc limit 1
@@ -75,9 +80,51 @@ export class ConversationRepository {
       from ${dbTable.userConversation}
       where ${dbTable.userConversation.userId} = ${userId} and ${dbTable.userConversation.isDeleted} = false
     )
-    order by ${c.id} desc`);
+    order by ${m.sentDate} desc`);
 
     return result.rows as unknown as ConversationList[];
+  }
+
+  async getUserGroupConversationList(userId: number) {
+    return await this.db.query.groupMember.findMany({
+      where: eq(dbTable.groupMember.userId, userId),
+      with: {
+        group: {
+          columns: {
+            conversationId: false,
+            createdAt: false,
+            updatedAt: false,
+          },
+          with: {
+            conversation: {
+              with: {
+                messages: {
+                  limit: 1,
+                  orderBy: desc(dbTable.message.id),
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async getConversationGroup(conversationId: number) {
+    return await this.db.query.group.findFirst({
+      where: eq(dbTable.group.conversationId, conversationId),
+      with: {
+        conversation: {
+          columns: {},
+          with: {
+            messages: {
+              limit: 1,
+              orderBy: desc(dbTable.message.id),
+            },
+          },
+        },
+      },
+    });
   }
 
   async getUserConversationList(userId: number) {
@@ -135,17 +182,22 @@ export class ConversationRepository {
     return res[0];
   }
 
-  async addUserToConversation({ conversationId, userId }: { userId: number; conversationId: number }) {
-    await this.db
-      .update(dbTable.userConversation)
-      .set({ isDeleted: false })
-      .where(and(eq(dbTable.userConversation.userId, userId), eq(dbTable.userConversation.conversationId, conversationId)));
+  async createManyUserConversation(conversationId: number, userIds: number[]) {
+    await this.db.insert(dbTable.userConversation).values(userIds.map((i) => ({ conversationId, userId: i })));
   }
 
-  async removeUserFromConversation({ conversationId, userId }: { userId: number; conversationId: number }) {
+  async updateUserConversation({
+    conversationId,
+    userId,
+    isDeleted,
+  }: {
+    userId: number;
+    conversationId: number;
+    isDeleted: boolean;
+  }) {
     await this.db
       .update(dbTable.userConversation)
-      .set({ isDeleted: true })
+      .set({ isDeleted })
       .where(and(eq(dbTable.userConversation.userId, userId), eq(dbTable.userConversation.conversationId, conversationId)));
   }
 }

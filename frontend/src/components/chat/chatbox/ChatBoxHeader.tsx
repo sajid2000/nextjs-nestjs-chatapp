@@ -9,14 +9,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ServerToClientEvents, socket } from "@/lib/socket";
-import { useConversationQuery } from "@/services/conversationService";
-import { ConversationUser } from "@/types";
+import { Conversation, useConversationQuery } from "@/services/conversationService";
 
 export default function ChatBoxHeader() {
   const searchParams = useSearchParams();
   const conversationId = parseInt(searchParams.get("conversation") ?? "");
 
-  const [user, setUser] = useState<ConversationUser>();
+  const [conversation, setConversation] = useState<Conversation>();
 
   const { data, isLoading } = useConversationQuery(conversationId);
 
@@ -24,33 +23,35 @@ export default function ChatBoxHeader() {
     (payload) => {
       const { userId } = payload;
 
-      if (user && user?.id === userId) {
-        setUser({ ...user, isOnline: true });
+      if (conversation && conversation?.id === userId) {
+        setConversation({ ...conversation, isOnline: true });
       }
     },
-    [user]
+    [conversation]
   );
 
   const onUserDisconnected: ServerToClientEvents["userDisconnected"] = useCallback(
     (payload) => {
       const { userId, lastSeen } = payload;
 
-      if (user && user?.id === userId) {
-        setUser({ ...user, isOnline: false, lastSeen });
+      if (conversation && conversation?.id === userId) {
+        setConversation({ ...conversation, isOnline: false, lastSeen });
       }
     },
-    [user]
+    [conversation]
   );
 
   useEffect(() => {
     if (!data) return;
 
-    setUser({
+    setConversation({
       id: data.participantOrGroupId,
       isOnline: data.isOnline,
       lastSeen: data.lastSeen,
       name: data.name,
       avatar: data.avatar,
+      isGroup: data.isGroup,
+      participantOrGroupId: data.participantOrGroupId,
     });
   }, [data]);
 
@@ -82,18 +83,20 @@ export default function ChatBoxHeader() {
     );
   }
 
-  if (!user) return null;
+  if (!conversation) return null;
 
   return (
     <div className="flex h-20 w-full items-center justify-between border-b p-4">
       <div className="flex items-center gap-2">
         <Avatar className="flex items-center justify-center">
-          <AvatarImage src={user.avatar ?? ""} alt={user.name} width={6} height={6} className="size-10 " />
-          <AvatarFallback>{user.name.slice(0, 1)}</AvatarFallback>
+          <AvatarImage src={conversation.avatar ?? ""} alt={conversation.name} width={6} height={6} className="size-10 " />
+          <AvatarFallback>{conversation.name.slice(0, 1)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
-          <span className="font-medium">{user.name}</span>
-          <span className="text-xs">{user.isOnline ? "Active now" : timeago.format(user.lastSeen)}</span>
+          <span className="font-medium">{conversation.name}</span>
+          <span className="text-xs">
+            {conversation.isOnline ? "Active now" : conversation.isGroup ? "" : timeago.format(conversation.lastSeen)}
+          </span>
         </div>
       </div>
 

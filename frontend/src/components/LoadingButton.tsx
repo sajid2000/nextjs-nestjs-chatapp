@@ -11,7 +11,7 @@ type Props = {
 
 const LoadingButton: React.FC<Props> = ({ loading, children, className, ...props }) => {
   return (
-    <Button disabled={loading} className={className} {...props}>
+    <Button type="submit" disabled={loading} className={className} {...props}>
       {loading && <Loader2Icon className="mr-2 animate-spin" />}
       {children}
     </Button>

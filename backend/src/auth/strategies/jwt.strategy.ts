@@ -30,10 +30,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, JWT_STRATEGY) {
   }
 
   async validate(payload: AccessTokenPayload): Promise<Request["user"]> {
-    const user = await this.authService.validateUser(payload.userId);
+    const user = await this.authService.validateUser(payload.phone);
 
     return {
-      id: payload.userId,
+      id: user.id,
       phone: user.phone,
       fullName: user.fullName,
       avatar: user.avatar,

@@ -40,7 +40,7 @@ export class UserService {
 
     const newUser = await this.userRepository.create({
       ...dto,
-      isOnline: true,
+      isOnline: false,
       password: bcrypt.hashSync(dto.password ?? "", this.authConf.bcryptSalt),
     });
 

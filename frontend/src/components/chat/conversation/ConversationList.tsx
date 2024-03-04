@@ -1,9 +1,8 @@
 "use client";
 
-import { MoreHorizontalIcon, SquarePenIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import CreateGroup from "@/components/group/CreateGroup";
 import { ServerToClientEvents, socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import { ConversationThread, useConversationListQuery } from "@/services/conversationService";
@@ -20,37 +19,36 @@ export default function ConversationList() {
     const { conversation, message, sender } = payload;
 
     setConversationList((v) => {
-      const updatedIndex = v.findIndex((i) => i.id === conversation.id);
+      const updatedConversation = v.find((i) => i.id === conversation.id);
 
-      if (updatedIndex === -1) return [];
+      if (!updatedConversation) return v;
 
-      return v.map((i, idx) => {
-        if (idx !== updatedIndex) return i;
-
-        return { ...i, lastMessage: { ...message, senderId: sender.id } };
-      });
+      return [
+        { ...updatedConversation, lastMessage: { ...message, senderId: sender.id } },
+        ...v.filter((i) => i.id !== updatedConversation.id),
+      ];
     });
   }, []);
 
   const onUserConnected: ServerToClientEvents["userConnected"] = useCallback((payload) => {
     const { userId } = payload;
     setConversationList((v) => {
-      const updatedIndex = v.findIndex((i) => i.participantOrGroupId === userId);
+      const updatedConversation = v.find((i) => i.participantOrGroupId === userId);
 
-      if (updatedIndex === -1) return [];
+      if (!updatedConversation) return v;
 
-      return v.map((i, idx) => (idx === updatedIndex ? { ...i, isOnline: true } : i));
+      return [{ ...updatedConversation, isOnline: true }, ...v.filter((i) => i.id !== updatedConversation.id)];
     });
   }, []);
 
   const onUserDisconnected: ServerToClientEvents["userDisconnected"] = useCallback((payload) => {
     const { userId, lastSeen } = payload;
     setConversationList((v) => {
-      const updatedIndex = v.findIndex((i) => i.participantOrGroupId === userId);
+      const updatedConversation = v.find((i) => i.participantOrGroupId === userId);
 
-      if (updatedIndex === -1) return [];
+      if (!updatedConversation) return v;
 
-      return v.map((i, idx) => (idx === updatedIndex ? { ...i, lastSeen, isOnline: false } : i));
+      return [{ ...updatedConversation, lastSeen, isOnline: false }, ...v.filter((i) => i.id !== updatedConversation.id)];
     });
   }, []);
 
@@ -82,12 +80,7 @@ export default function ConversationList() {
           <span className="">({conversationList.length})</span>
         </div>
         <div>
-          <Button variant={"ghost"} size={"icon"} className="size-9">
-            <MoreHorizontalIcon size={20} />
-          </Button>
-          <Button variant={"ghost"} size={"icon"} className="size-9">
-            <SquarePenIcon size={20} />
-          </Button>
+          <CreateGroup />
         </div>
       </div>
       <nav className={cn("flex flex-col gap-2")}>

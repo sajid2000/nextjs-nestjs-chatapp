@@ -33,7 +33,7 @@ export const userContact = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
   },
   (t) => ({
-    pk: primaryKey(t.userId, t.contactId),
+    pk: primaryKey({ columns: [t.userId, t.contactId] }),
   })
 );
 
@@ -72,7 +72,7 @@ export const userConversation = pgTable(
     isDeleted: boolean("isDeleted").notNull().default(false),
   },
   (t) => ({
-    pk: primaryKey(t.userId, t.conversationId),
+    pk: primaryKey({ columns: [t.userId, t.conversationId] }),
   })
 );
 
@@ -110,6 +110,72 @@ export const messageRelations = relations(message, ({ one }) => ({
   }),
   conversation: one(conversation, {
     fields: [message.conversationId],
+    references: [conversation.id],
+  }),
+}));
+
+export const group = pgTable("group", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversationId")
+    .notNull()
+    .references(() => conversation.id, { onDelete: "cascade" }),
+  name: varchar("groupName", { length: 100 }).notNull(),
+  image: varchar("groupImage", { length: 100 }),
+  creator: integer("creator").references(() => user.id, { onDelete: "set null" }),
+  ...timestampFields,
+});
+
+export const groupRelations = relations(group, ({ one }) => ({
+  conversation: one(conversation, {
+    fields: [group.conversationId],
+    references: [conversation.id],
+  }),
+}));
+
+export const groupMember = pgTable(
+  "groupMember",
+  {
+    userId: integer("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    groupId: integer("groupId")
+      .notNull()
+      .references(() => group.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.groupId, t.userId] }),
+  })
+);
+
+export const groupMemberRelations = relations(groupMember, ({ one }) => ({
+  group: one(group, {
+    fields: [groupMember.groupId],
+    references: [group.id],
+  }),
+}));
+
+export const groupToConversation = pgTable(
+  "groupToConversation",
+  {
+    conversationId: integer("conversationId")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    groupId: integer("groupId")
+      .notNull()
+      .references(() => group.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.groupId, t.conversationId] }),
+  })
+);
+
+export const groupToConversationRelations = relations(groupToConversation, ({ one }) => ({
+  group: one(group, {
+    fields: [groupToConversation.groupId],
+    references: [group.id],
+  }),
+  conversation: one(conversation, {
+    fields: [groupToConversation.conversationId],
     references: [conversation.id],
   }),
 }));

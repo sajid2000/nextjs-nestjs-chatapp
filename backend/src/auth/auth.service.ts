@@ -37,7 +37,7 @@ export class AuthService {
         throw new ValidationException("password", "Invalid password");
       }
 
-      const { accessToken } = this.generateAuthTokens(user.id);
+      const { accessToken } = this.generateAuthTokens(user.phone);
 
       return { accessToken, user: new UserEntity(user) };
     } catch (error) {
@@ -47,16 +47,16 @@ export class AuthService {
     }
   }
 
-  async validateUser(id: number) {
-    const user = await this.userService.findById(id);
+  async validateUser(phone: number) {
+    const user = await this.userService.findByPhone(phone);
 
     if (!user) throw new UnauthorizedException();
 
     return user;
   }
 
-  private generateAuthTokens(userId: number) {
-    const payload: AccessTokenPayload = { userId };
+  private generateAuthTokens(phone: number) {
+    const payload: AccessTokenPayload = { phone };
 
     const accessToken = this.jwtService.sign(payload);
 

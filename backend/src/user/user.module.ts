@@ -10,6 +10,6 @@ import { UserService } from "./services/user.service";
 @Module({
   controllers: [ContactController, ProfileController],
   providers: [UserService, UserRepository, ContactService, ContactRepository],
-  exports: [UserService, UserRepository, ContactService, ContactRepository],
+  exports: [UserService, UserRepository],
 })
 export class UserModule {}

@@ -41,9 +41,9 @@ export function useConversationListQuery(options?: MyQueryOptions<ConversationTh
   return useQuery({ queryKey: [API_ENDPOINT], ...options });
 }
 
-export function useCreateConversation(options?: MyMutationOptions<any, CreateConversationDto>) {
+export function useStartConversation(options?: MyMutationOptions<any, CreateConversationDto>) {
   return useMutation({
-    mutationFn: (dto) => axios.post(API_ENDPOINT, dto),
+    mutationFn: (dto) => axios.post<Conversation>(`${API_ENDPOINT}/private`, dto),
     onSuccess: invalidateConversationList,
     ...options,
   });

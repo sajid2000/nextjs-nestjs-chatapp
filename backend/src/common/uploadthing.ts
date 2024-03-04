@@ -5,7 +5,14 @@ const f = createUploadthing();
 export const uploadRouter: FileRouter = {
   avatar: f({
     image: {
-      maxFileSize: "2MB",
+      maxFileSize: "1MB",
+    },
+  }).onUploadComplete(() => {
+    //
+  }),
+  groupImage: f({
+    image: {
+      maxFileSize: "1MB",
     },
   }).onUploadComplete(() => {
     //

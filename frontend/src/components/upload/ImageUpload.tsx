@@ -8,7 +8,7 @@ import { UploadDropzone, UploadedFile } from "@/lib/uploadthing";
 import { Button } from "../ui/button";
 
 type Props = {
-  endpoint: "avatar";
+  endpoint: "avatar" | "groupImage";
   onUpload: (url?: string) => void;
   value?: string;
 };

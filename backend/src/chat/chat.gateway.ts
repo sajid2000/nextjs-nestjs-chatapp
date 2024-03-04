@@ -242,6 +242,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       secret: this.authConf.accessTokenSecret,
     }) as AccessTokenPayload;
 
-    return this.userService.findById(payload.userId);
+    return this.userService.findByPhone(payload.phone);
   }
 }

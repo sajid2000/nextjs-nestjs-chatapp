@@ -12,7 +12,7 @@ import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 
 export type AccessTokenPayload = {
-  userId: number;
+  phone: number;
 };
 
 export const JWT_STRATEGY = "jwt";

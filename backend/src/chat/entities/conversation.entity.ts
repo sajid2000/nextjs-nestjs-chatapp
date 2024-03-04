@@ -43,7 +43,7 @@ export class ChatThreadEntity {
 
   lastSeen: Date;
 
-  lastMessage: Omit<MessageEntity, "conversationId" | "replyId">;
+  lastMessage?: Omit<MessageEntity, "conversationId" | "replyId">;
 
   constructor(items: ChatThreadEntity) {
     Object.assign(this, items);

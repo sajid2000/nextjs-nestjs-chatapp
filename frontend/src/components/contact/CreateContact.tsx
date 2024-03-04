@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { UserPlusIcon } from "lucide-react";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -10,13 +11,11 @@ import { ApplicationError, ValidationError } from "@/lib/errors";
 import { CreateContactDto, createContactSchema, useCreateContact } from "@/services/contactService";
 
 import LoadingButton from "../LoadingButton";
+import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
 
-type Props = {
-  trigger: React.ReactNode;
-};
-const CreateContact: React.FC<Props> = ({ trigger }) => {
+const CreateContact: React.FC = () => {
   const { mutateAsync: createContact } = useCreateContact();
 
   const form = useForm<CreateContactDto>({
@@ -51,7 +50,11 @@ const CreateContact: React.FC<Props> = ({ trigger }) => {
 
   return (
     <Dialog>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogTrigger asChild>
+        <Button variant={"ghost"} className="h-12 w-full justify-start gap-4 px-2">
+          <UserPlusIcon className="size-8 rounded-full bg-primary p-1 text-primary-foreground" /> New contact
+        </Button>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Contact</DialogTitle>

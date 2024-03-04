@@ -5,6 +5,28 @@ CREATE TABLE IF NOT EXISTS "conversation" (
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "group" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"conversationId" integer NOT NULL,
+	"groupName" varchar(100) NOT NULL,
+	"groupImage" varchar(100),
+	"creator" integer,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "groupMember" (
+	"userId" integer NOT NULL,
+	"groupId" integer NOT NULL,
+	CONSTRAINT "groupMember_groupId_userId_pk" PRIMARY KEY("groupId","userId")
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "groupToConversation" (
+	"conversationId" integer NOT NULL,
+	"groupId" integer NOT NULL,
+	CONSTRAINT "groupToConversation_groupId_conversationId_pk" PRIMARY KEY("groupId","conversationId")
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "message" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"messageContent" text NOT NULL,
@@ -39,9 +61,45 @@ CREATE TABLE IF NOT EXISTS "userContact" (
 CREATE TABLE IF NOT EXISTS "userConversation" (
 	"userId" integer NOT NULL,
 	"conversationId" integer NOT NULL,
-	"isDeleted" boolean DEFAULT false,
+	"isDeleted" boolean DEFAULT false NOT NULL,
 	CONSTRAINT "userConversation_userId_conversationId_pk" PRIMARY KEY("userId","conversationId")
 );
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "group" ADD CONSTRAINT "group_conversationId_conversation_id_fk" FOREIGN KEY ("conversationId") REFERENCES "conversation"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "group" ADD CONSTRAINT "group_creator_user_id_fk" FOREIGN KEY ("creator") REFERENCES "user"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "groupMember" ADD CONSTRAINT "groupMember_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "groupMember" ADD CONSTRAINT "groupMember_groupId_group_id_fk" FOREIGN KEY ("groupId") REFERENCES "group"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "groupToConversation" ADD CONSTRAINT "groupToConversation_conversationId_conversation_id_fk" FOREIGN KEY ("conversationId") REFERENCES "conversation"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "groupToConversation" ADD CONSTRAINT "groupToConversation_groupId_group_id_fk" FOREIGN KEY ("groupId") REFERENCES "group"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
 --> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "message" ADD CONSTRAINT "message_senderId_user_id_fk" FOREIGN KEY ("senderId") REFERENCES "user"("id") ON DELETE no action ON UPDATE no action;

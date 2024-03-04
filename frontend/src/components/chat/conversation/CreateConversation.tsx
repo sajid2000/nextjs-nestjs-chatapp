@@ -1,15 +1,13 @@
 "use client";
 
-import { UserPlusIcon, UsersIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import ContactList from "@/components/contact/ContactList";
 import CreateContact from "@/components/contact/CreateContact";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import axios from "@/lib/axios";
-import { useCreateConversation } from "@/services/conversationService";
+import { useContactList } from "@/services/contactService";
+import { useStartConversation } from "@/services/conversationService";
 
 type Props = {
   trigger: React.ReactNode;
@@ -17,14 +15,19 @@ type Props = {
 
 const CreateConversation: React.FC<Props> = ({ trigger }) => {
   const router = useRouter();
-
   const [open, setOpen] = useState(false);
 
-  const { mutateAsync: createConversation } = useCreateConversation();
+  const { data, isLoading } = useContactList();
+  const { mutateAsync: startConversation } = useStartConversation();
 
   const handleStartConversation = async (contactId: number) => {
     try {
-      await createConversation({ contactId, isGroup: false });
+      const res = await startConversation({ contactId, isGroup: false });
+
+      if (res.data.id) {
+        router.push(`/?conversation=${res.data.id}`);
+        setOpen(false);
+      }
     } catch (error) {
       console.log(error);
     }
@@ -33,24 +36,30 @@ const CreateConversation: React.FC<Props> = ({ trigger }) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent side={"left"}>
+      <SheetContent side={"left"} className="space-y-2">
         <SheetHeader>
           <SheetTitle>Start new conversation</SheetTitle>
         </SheetHeader>
-        <div className="mt-10 space-y-2">
-          <CreateContact
-            trigger={
-              <Button variant={"ghost"} className="h-12 w-full justify-start gap-4 px-2">
-                <UserPlusIcon className="size-8 rounded-full bg-primary p-1 text-primary-foreground" /> New contact
-              </Button>
-            }
-          />
-          <Button variant={"ghost"} className="h-12 w-full justify-start gap-4 px-2">
-            <UsersIcon className="size-8 rounded-full bg-primary p-1 text-primary-foreground" /> New group
-          </Button>
+        <div className="space-y-2">
+          <CreateContact />
         </div>
-        <p className="mt-10 p-2">Contacts</p>
-        <ContactList handleStartConversation={handleStartConversation} />
+        <p className="p-2">Contacts</p>
+        <ul>
+          {data?.map((contact) => (
+            <li
+              role="button"
+              key={contact.id}
+              className="flex w-full items-center gap-4 rounded-md p-2 hover:bg-accent/40"
+              onClick={() => handleStartConversation(contact.id)}
+            >
+              <Avatar>
+                <AvatarImage src={contact.avatar ?? ""} alt="" className="size-12" />
+                <AvatarFallback>{contact.fullName.slice(0, 1)}</AvatarFallback>
+              </Avatar>
+              <p>{contact.fullName}</p>
+            </li>
+          ))}
+        </ul>
       </SheetContent>
     </Sheet>
   );

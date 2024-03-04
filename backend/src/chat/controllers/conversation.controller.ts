@@ -15,9 +15,9 @@ export class ConversationController {
     private readonly messageService: MessageService
   ) {}
 
-  @Post()
+  @Post("private")
   async createConversation(@Req() req: Request, @Body() dto: CreateConversationDto) {
-    return this.conversationService.createConversation({ ...dto, userId: req.user.id });
+    return this.conversationService.createOrGetPrivateConversation({ ...dto, userId: req.user.id });
   }
 
   @Get()

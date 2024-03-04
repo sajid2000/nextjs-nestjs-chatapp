@@ -24,14 +24,12 @@ const ConversationListItem: React.FC<Props> = ({ conversation }) => {
           {conversation.isOnline && <span className="absolute bottom-1 right-1 size-2 rounded-full bg-indigo-600"></span>}
         </div>
         <div className="overflow-hidden">
-          <p>{conversation.name}</p>
+          <p className="text-lg">{conversation.name}</p>
 
-          {conversation.lastMessage && (
-            <p className="truncate text-xs text-muted-foreground">
-              {user?.id === conversation.lastMessage.senderId && "You: "}
-              {conversation.lastMessage.messageContent}
-            </p>
-          )}
+          <p className="truncate text-sm text-muted-foreground">
+            {user?.id === conversation?.lastMessage?.senderId && "You: "}
+            {conversation.lastMessage?.messageContent ?? "Start a conversation"}
+          </p>
         </div>
       </Link>
     </Button>

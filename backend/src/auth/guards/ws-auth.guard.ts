@@ -37,7 +37,7 @@ export class WSAuthGuard implements CanActivate {
         secret: this.authConf.accessTokenSecret,
       }) as AccessTokenPayload;
 
-      const user = await this.userService.findById(payload.userId);
+      const user = await this.userService.findByPhone(payload.phone);
 
       client.request.user = user;
 
