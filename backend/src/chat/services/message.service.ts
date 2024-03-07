@@ -16,7 +16,7 @@ export class MessageService {
   async getMessagesByConversationId(userId: number, conversationId: number, filter: MessageQueryParams) {
     const { limit, cursor } = filter;
 
-    const conversation = await this.conversationService.getUserConversation({ userId, conversationId });
+    const conversation = await this.conversationService.getConversationOfUser({ userId, conversationId });
 
     const result = await this.messageRepository.getAllMessageByConversation(conversation.id, filter);
 
@@ -43,7 +43,7 @@ export class MessageService {
   }
 
   async updateStatus(userId: number, dto: UpdateMessageDto) {
-    await this.conversationService.getUserConversation({ userId, conversationId: dto.conversationId });
+    await this.conversationService.getConversationOfUser({ userId, conversationId: dto.conversationId });
 
     return await this.messageRepository.updateStatus(dto);
   }

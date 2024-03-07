@@ -11,8 +11,8 @@ export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
   @Get()
-  async getUserContacts(@Req() req: Request) {
-    return this.contactService.getUserContact(req.user.id);
+  async getAllContactOfUser(@Req() req: Request) {
+    return this.contactService.getAllContactOfUser(req.user.id);
   }
 
   @Post()
@@ -20,8 +20,8 @@ export class ContactController {
     return this.contactService.create({ phone: dto.phone, userId: req.user.id });
   }
 
-  @Delete(":contactId")
-  async removeContact(@Req() req: Request, @Param("contactId", ParseIntPipe) contactId: number) {
+  @Delete(":id")
+  async removeContact(@Req() req: Request, @Param("id", ParseIntPipe) contactId: number) {
     return this.contactService.remove({ userId: req.user.id, contactId });
   }
 }

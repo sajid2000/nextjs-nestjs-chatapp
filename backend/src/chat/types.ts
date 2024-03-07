@@ -3,7 +3,7 @@ export interface MessageQueryParams {
   cursor?: number;
 }
 
-export interface ConversationList {
+export interface Thread {
   id: number;
   participantId: number;
   isGroup: boolean;
@@ -35,7 +35,7 @@ export interface MessageResponsePayload {
   };
   sender: {
     id: number;
-    name: string;
+    fullName: string;
     avatar: string | null;
   };
 }

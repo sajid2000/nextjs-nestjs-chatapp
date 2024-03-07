@@ -14,7 +14,7 @@ export class ContactService {
     private readonly contactRepository: ContactRepository
   ) {}
 
-  async getUserContact(userId: number) {
+  async getAllContactOfUser(userId: number) {
     const res = await this.contactRepository.findAllByUserId(userId);
 
     return res.map((i) => new ContactEntity(i.contact));
@@ -25,7 +25,7 @@ export class ContactService {
 
     if (!contact || contact.id === dto.userId) throw new ValidationException("phone", "Contact not found!");
 
-    const existedItem = await this.contactRepository.findByContactId({ contactId: contact.id, userId: dto.userId });
+    const existedItem = await this.contactRepository.findUserContact({ contactId: contact.id, userId: dto.userId });
 
     if (existedItem) throw new ValidationException("phone", "Already exists");
 

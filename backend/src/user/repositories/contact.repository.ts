@@ -8,9 +8,10 @@ import * as dbTable from "@/db/schema";
 export class ContactRepository {
   constructor(@Inject(DB_CONNECTION) private db: DB) {}
 
-  async findByContactId(data: { userId: number; contactId: number }) {
+  async findUserContact(data: { userId: number; contactId: number }) {
     return this.db.query.userContact.findFirst({
       where: and(eq(dbTable.userContact.userId, data.userId), eq(dbTable.userContact.contactId, data.contactId)),
+      with: { contact: true },
     });
   }
 

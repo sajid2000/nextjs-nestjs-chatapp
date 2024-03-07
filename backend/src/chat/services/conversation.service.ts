@@ -1,45 +1,39 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 
-import { UserService } from "@/user/services/user.service";
-
-import { CreateConversationDto } from "../dto/conversation.dto";
-import { ChatThreadEntity, ConversationEntity } from "../entities/conversation.entity";
+import { CreateGroupDto } from "../dto/group.dto";
+import { ThreadEntity } from "../entities/conversation.entity";
+import { GroupInfoEntity } from "../entities/group.entity";
 import { ConversationRepository } from "../repositories/conversation.repository";
+import { GroupRepository } from "../repositories/group.repository";
+
+type UserConversationFilter = {
+  userId: number;
+  conversationId: number;
+};
+
+type UserContactFilter = {
+  userId: number;
+  contactId: number;
+};
 
 @Injectable()
 export class ConversationService {
   constructor(
-    private userService: UserService,
+    private groupRepository: GroupRepository,
     private conversationRepository: ConversationRepository
   ) {}
 
-  async createGroupConversation(dto: { members: number[] }) {
-    const conversation = (await this.conversationRepository.createGroupConversation())[0];
-
-    if (!conversation) throw new UnprocessableEntityException();
-
-    await this.conversationRepository.createManyUserConversation(conversation.id, dto.members);
-
-    return conversation;
+  async getAllConversationsIdOfUser(userId: number) {
+    return this.conversationRepository.getAllConversationsIdOfUser(userId);
   }
 
-  async createOrGetPrivateConversation(dto: CreateConversationDto & { userId: number }) {
-    const exists = await this.conversationRepository.getConversationOfTwoUser(dto.userId, dto.contactId);
+  async getAllConversationOfUser(userId: number) {
+    const groupConversation = await this.conversationRepository.getAllGroupConversationOfUserWithLastMessage(userId);
+    const privateConversations = await this.conversationRepository.getAllPrivateConversationOfUserWithLastMessage(userId);
 
-    if (exists) return exists;
-
-    return this.conversationRepository.createPrivateConversation(dto);
-  }
-
-  async getUserConversationThreads(userId: number) {
-    const privateConversations = await this.conversationRepository.getUserPrivateConversations(userId);
-
-    const groupConversation = await this.conversationRepository.getUserGroupConversationList(userId);
-
-    const groupChat = groupConversation.map(({ group }) => {
-      const lastMessage = group.conversation.messages[0];
-      return new ChatThreadEntity({
-        id: group.conversation.id,
+    const groupThreads = groupConversation.map(({ conversation, group, lastMessage }) => {
+      return new ThreadEntity({
+        id: conversation.id,
         name: group.name,
         avatar: group.image,
         isGroup: true,
@@ -61,8 +55,8 @@ export class ConversationService {
       });
     });
 
-    const privateChat = privateConversations.map((i) => {
-      return new ChatThreadEntity({
+    const privateThreads = privateConversations.map((i) => {
+      return new ThreadEntity({
         id: i.id,
         name: i.name,
         avatar: i.avatar,
@@ -83,7 +77,7 @@ export class ConversationService {
       });
     });
 
-    return [...groupChat, ...privateChat].sort((a, b) => {
+    return [...groupThreads, ...privateThreads].sort((a, b) => {
       if (a.lastMessage && b.lastMessage) {
         return new Date(b.lastMessage.sentDate).getTime() - new Date(a.lastMessage.sentDate).getTime();
       }
@@ -92,67 +86,157 @@ export class ConversationService {
     });
   }
 
-  async getUserConversationList(userId: number) {
-    return this.conversationRepository.getUserConversationList(userId);
-  }
+  async getConversationWithDetails(dto: UserConversationFilter) {
+    const conversation = await this.getConversationOfUser(dto);
 
-  async getUserConversation(dto: { userId: number; conversationId: number }) {
-    const res = await this.conversationRepository.getUserConversation(dto);
-
-    if (!res) throw new NotFoundException("Conversation not found!");
-
-    if (res.conversation.isGroup) {
-      const group = await this.conversationRepository.getConversationGroup(res.conversation.id);
+    if (conversation.isGroup) {
+      const group = await this.groupRepository.findByConversationId(conversation.id);
 
       if (!group) throw new NotFoundException();
 
-      return new ConversationEntity({
-        id: res.conversation.id,
+      return new ThreadEntity({
+        id: conversation.id,
+        participantOrGroupId: group.id,
         isGroup: true,
         name: group.name,
         avatar: group.image,
         isDeleted: false,
-        participantOrGroupId: group.id,
         isOnline: false,
         lastSeen: new Date(),
       });
     } else {
-      const participantId = await this.conversationRepository.getConversationParticipantId(dto);
+      const participant = await this.getPrivateConversationParticipantOfUser(dto);
 
-      if (!participantId) throw new NotFoundException("Participant not found");
-
-      const participant = await this.userService.findById(participantId);
-
-      return new ConversationEntity({
-        id: res.conversation.id,
+      return new ThreadEntity({
+        id: conversation.id,
+        participantOrGroupId: participant.id,
         isGroup: false,
         name: participant.fullName,
         avatar: participant.avatar,
-        isDeleted: res.isDeleted,
+        isDeleted: conversation.isDeleted,
         isOnline: participant.isOnline,
         lastSeen: participant.lastSeen,
-        participantOrGroupId: participant.id,
       });
     }
   }
 
-  async getConversationOfTwoUser(user1Id: number, user2Id: number) {
-    const res = await this.conversationRepository.getConversationOfTwoUser(user1Id, user2Id);
+  async createPrivateConversation(dto: UserContactFilter) {
+    try {
+      const conversation = await this.getPrivateConversationBetweenTwoUser(dto);
+      const { isDeleted, ...rest } = await this.getConversationOfUser({ userId: dto.userId, conversationId: conversation.id });
+
+      if (isDeleted) {
+        await this.conversationRepository.updateUserConversation(conversation.id, { isDeleted: false });
+      }
+
+      return rest;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        const createdConversation = await this.conversationRepository.createConversation({ isGroup: false });
+
+        await this.conversationRepository.createManyUserConversation(createdConversation.id, [dto.userId, dto.contactId]);
+
+        return createdConversation;
+      }
+
+      throw error;
+    }
+  }
+
+  async getPrivateConversationParticipantOfUser(dto: UserConversationFilter) {
+    const res = await this.conversationRepository.getPrivateConversationParticipantOfUser(dto);
+
+    if (!res) throw new NotFoundException();
+
+    return res;
+  }
+
+  async getPrivateConversationByContact(dto: UserContactFilter) {
+    const conversation = await this.getPrivateConversationBetweenTwoUser(dto);
+    const userConversation = await this.getConversationOfUser({ userId: dto.userId, conversationId: conversation.id });
+
+    if (userConversation.isDeleted) throw new NotFoundException("Conversation not found!");
+
+    return conversation;
+  }
+
+  async getPrivateConversationBetweenTwoUser({ contactId, userId }: UserContactFilter) {
+    const conversation = await this.conversationRepository.getPrivateConversationBetweenTwoUser(userId, contactId);
+
+    if (!conversation) throw new NotFoundException("Conversation not found!");
+
+    return conversation;
+  }
+
+  async createGroupConversation(userId: number, dto: CreateGroupDto) {
+    const conversation = await this.conversationRepository.createConversation({ isGroup: true });
+
+    await this.conversationRepository.createManyUserConversation(conversation.id, [...dto.members, userId]);
+
+    const group = await this.groupRepository.create({
+      creator: userId,
+      conversationId: conversation.id,
+      name: dto.name,
+      image: dto.image,
+      members: [...dto.members, userId],
+    });
+
+    return {
+      ...conversation,
+      groupId: group.id,
+    };
+  }
+
+  async getGroupConversationInfo(dto: UserConversationFilter) {
+    const group = await this.getConversationGroupOfUser(dto);
+
+    const members = await this.groupRepository.getAllMembersOfGroup(group.id);
+
+    return new GroupInfoEntity({ ...group, members });
+  }
+
+  async getGroupMemberInfo(userId: number, dto: { conversationId: number; memberId: number }) {
+    const group = await this.getConversationGroupOfUser({ userId, conversationId: dto.conversationId });
+    const member = await this.groupRepository.getGroupMember({ groupId: group.id, memberId: dto.memberId });
+
+    return member;
+  }
+
+  async deleteGroupConversation(dto: UserConversationFilter) {
+    const conversation = await this.getConversationGroupOfUser(dto);
+
+    return this.conversationRepository.removeConversation(conversation.id);
+  }
+
+  async removeUserConversation(dto: UserConversationFilter) {
+    const conversation = await this.getConversationOfUser(dto);
+
+    return this.conversationRepository.updateUserConversation(conversation.id, { isDeleted: true });
+  }
+
+  async addUserToConversation(dto: UserConversationFilter) {
+    const conversation = await this.getConversationOfUser(dto);
+
+    return this.conversationRepository.updateUserConversation(conversation.id, { isDeleted: false });
+  }
+
+  async getConversationOfUser(dto: UserConversationFilter) {
+    const res = await this.conversationRepository.getConversationOfUser(dto);
 
     if (!res) throw new NotFoundException("Conversation not found!");
 
     return res;
   }
 
-  // async removeUserFromConversation(dto: { userId: number; conversationId: number }) {
-  //   return this.conversationRepository.removeUserFromConversation(dto);
-  // }
+  private async getConversationGroupOfUser(dto: UserConversationFilter) {
+    const conversation = await this.conversationRepository.getConversationOfUser(dto);
 
-  async addUserToConversation(dto: { userId: number; conversationId: number }) {
-    const res = await this.conversationRepository.getUserConversation(dto);
+    if (!conversation || !conversation.isGroup) throw new NotFoundException("Conversation not found!");
 
-    if (!res) throw new NotFoundException("Conversation not found!");
+    const group = await this.groupRepository.findByConversationId(dto.conversationId);
 
-    if (res.isDeleted) await this.conversationRepository.updateUserConversation({ ...dto, isDeleted: false });
+    if (!group) throw new NotFoundException("Conversation not found!");
+
+    return group;
   }
 }

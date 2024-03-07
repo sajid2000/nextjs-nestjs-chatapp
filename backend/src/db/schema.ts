@@ -104,6 +104,10 @@ export const message = pgTable("message", {
 });
 
 export const messageRelations = relations(message, ({ one }) => ({
+  sender: one(user, {
+    fields: [message.senderId],
+    references: [user.id],
+  }),
   replyMessage: one(message, {
     fields: [message.replyId],
     references: [message.id],
@@ -125,11 +129,12 @@ export const group = pgTable("group", {
   ...timestampFields,
 });
 
-export const groupRelations = relations(group, ({ one }) => ({
+export const groupRelations = relations(group, ({ one, many }) => ({
   conversation: one(conversation, {
     fields: [group.conversationId],
     references: [conversation.id],
   }),
+  members: many(groupMember),
 }));
 
 export const groupMember = pgTable(
@@ -152,30 +157,8 @@ export const groupMemberRelations = relations(groupMember, ({ one }) => ({
     fields: [groupMember.groupId],
     references: [group.id],
   }),
-}));
-
-export const groupToConversation = pgTable(
-  "groupToConversation",
-  {
-    conversationId: integer("conversationId")
-      .notNull()
-      .references(() => conversation.id, { onDelete: "cascade" }),
-    groupId: integer("groupId")
-      .notNull()
-      .references(() => group.id, { onDelete: "cascade" }),
-  },
-  (t) => ({
-    pk: primaryKey({ columns: [t.groupId, t.conversationId] }),
-  })
-);
-
-export const groupToConversationRelations = relations(groupToConversation, ({ one }) => ({
-  group: one(group, {
-    fields: [groupToConversation.groupId],
-    references: [group.id],
-  }),
-  conversation: one(conversation, {
-    fields: [groupToConversation.conversationId],
-    references: [conversation.id],
+  user: one(user, {
+    fields: [groupMember.groupId],
+    references: [user.id],
   }),
 }));

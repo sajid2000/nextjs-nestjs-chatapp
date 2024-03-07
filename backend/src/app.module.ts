@@ -9,7 +9,6 @@ import { AuthModule } from "./auth/auth.module";
 import { ChatModule } from "./chat/chat.module";
 import { appConfig, authConfig, dbConfig } from "./config";
 import { DbModule } from "./db/db.module";
-import { GroupModule } from "./group/group.module";
 import { UserModule } from "./user/user.module";
 
 const MyZodValidationPipe = createZodValidationPipe({
@@ -35,7 +34,6 @@ const MyZodValidationPipe = createZodValidationPipe({
     UserModule,
     AuthModule,
     ChatModule,
-    GroupModule,
   ],
   providers: [
     AppService,

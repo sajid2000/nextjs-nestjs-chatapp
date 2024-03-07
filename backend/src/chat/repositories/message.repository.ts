@@ -14,17 +14,24 @@ export class MessageRepository {
   async getAllMessageByConversation(conversationId: number, filter: MessageQueryParams) {
     const { limit = 15, cursor } = filter;
 
-    return await this.db
-      .select()
-      .from(dbTable.message)
-      .where(
-        and(
-          eq(dbTable.message.conversationId, conversationId),
-          cursor ? lt(dbTable.message.id, cursor) : gt(dbTable.message.id, 0)
-        )
-      )
-      .orderBy(desc(dbTable.message.id))
-      .limit(limit);
+    return this.db.query.message.findMany({
+      where: and(
+        eq(dbTable.message.conversationId, conversationId),
+        cursor ? lt(dbTable.message.id, cursor) : gt(dbTable.message.id, 0)
+      ),
+      limit,
+      orderBy: desc(dbTable.message.id),
+      with: {
+        sender: {
+          columns: {
+            id: true,
+            fullName: true,
+            avatar: true,
+            phone: true,
+          },
+        },
+      },
+    });
   }
 
   async create(data: typeof dbTable.message.$inferInsert) {
@@ -38,7 +45,7 @@ export class MessageRepository {
       .where(and(eq(dbTable.message.id, messageId), eq(dbTable.message.conversationId, conversationId)));
   }
 
-  async remove(userId: number, messageId: number) {
+  async removeUserMessage(userId: number, messageId: number) {
     return (
       await this.db
         .delete(dbTable.message)

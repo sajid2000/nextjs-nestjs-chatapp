@@ -8,6 +8,13 @@
       "when": 1709550131764,
       "tag": "0000_wooden_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1709726933535,
+      "tag": "0001_tan_hawkeye",
+      "breakpoints": true
     }
   ]
 }

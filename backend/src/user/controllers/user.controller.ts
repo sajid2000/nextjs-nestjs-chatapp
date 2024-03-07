@@ -10,7 +10,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get(":id")
-  async findOne(@Param("id", ParseIntPipe) id: number) {
-    return this.userService.findById(id);
+  async getUserInfo(@Param("id", ParseIntPipe) userId: number) {
+    return this.userService.findById(userId);
   }
 }
