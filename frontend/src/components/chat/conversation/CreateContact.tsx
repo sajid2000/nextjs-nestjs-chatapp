@@ -10,10 +10,10 @@ import { Input } from "@/components/ui/input";
 import { ApplicationError, ValidationError } from "@/lib/errors";
 import { CreateContactDto, createContactSchema, useCreateContact } from "@/services/contactService";
 
-import LoadingButton from "../LoadingButton";
-import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
+import LoadingButton from "../../LoadingButton";
+import { Button } from "../../ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../../ui/form";
 
 const CreateContact: React.FC = () => {
   const { mutateAsync: createContact } = useCreateContact();

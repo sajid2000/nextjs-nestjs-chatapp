@@ -1,0 +1,123 @@
+import { ExitIcon } from "@radix-ui/react-icons";
+import { MoreVerticalIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useAlert } from "@/contexts/AlertProvider";
+import { useSession } from "@/contexts/SessionProvider";
+import { useDeleteConversation, useGroupConversationInfo, useLeaveConversation } from "@/services/conversationService";
+
+import Loading from "../Loading";
+
+type Props = {
+  conversationId: number;
+};
+
+const GroupInfo: React.FC<Props> = ({ conversationId }) => {
+  const router = useRouter();
+
+  const { showAlert } = useAlert();
+  const { user } = useSession();
+  const { data, isLoading } = useGroupConversationInfo(conversationId);
+  const { mutateAsync: leaveConversation } = useLeaveConversation();
+  const { mutateAsync: deleteGroup } = useDeleteConversation();
+
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size={"icon"} variant={"secondary"} className="rounded-full">
+          <MoreVerticalIcon />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side={"right"} className="space-y-2 p-0">
+        <SheetHeader className="p-5">
+          <SheetTitle>Group Info</SheetTitle>
+        </SheetHeader>
+        {isLoading ? (
+          <Loading />
+        ) : (
+          data && (
+            <div className="space-y-6 divide-y">
+              <div className="flex flex-col items-center gap-2">
+                <Avatar className="size-44">
+                  <AvatarImage src={data.image ?? ""} alt="" />
+                  <AvatarFallback>{data.name[0]}</AvatarFallback>
+                </Avatar>
+                <p>{data.name}</p>
+                <p>Group - {data.members.length} members</p>
+              </div>
+              <div className="pt-6">
+                {user?.id === data.creator ? (
+                  <>
+                    <Button variant={"ghost"} className="h-12 w-full items-center justify-start gap-4">
+                      <PencilIcon className="size-5" /> Edit Group
+                    </Button>
+                    <Button
+                      variant={"ghost"}
+                      className="h-12 w-full items-center justify-start gap-4 text-red-500"
+                      onClick={() => {
+                        showAlert({
+                          actionLabel: "Delete",
+                          action: async () => {
+                            await deleteGroup(data.id);
+                            router.push("/");
+                          },
+                        });
+                      }}
+                    >
+                      <Trash2Icon className="size-5" /> Delete Group
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant={"ghost"}
+                    className="h-12 w-full items-center justify-start gap-4 text-red-500"
+                    onClick={() => {
+                      showAlert({
+                        actionLabel: "Leave",
+                        action: () => leaveConversation(data.id),
+                      });
+                    }}
+                  >
+                    <ExitIcon className="size-5" /> Leave Group
+                  </Button>
+                )}
+              </div>
+              <div className="pt-6">
+                <p className="px-6 py-2">Members</p>
+                <ul>
+                  {data.members.map((member) => (
+                    <Button key={member.id} variant={"ghost"} asChild className="h-auto w-full justify-start gap-4">
+                      <li>
+                        <Avatar className="size-12">
+                          <AvatarImage src={member.avatar ?? ""} alt="" />
+                          <AvatarFallback>{member.fullName[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="w-full space-y-2">
+                          <div className="flex w-full items-center justify-between gap-2 overflow-hidden">
+                            <p className="truncate text-lg">{member.id === user?.id ? "You" : member.fullName}</p>
+                            {member.id === data.creator && (
+                              <p className="rounded-full bg-primary p-0.5 text-xs text-primary-foreground">Admin</p>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground">{member.phone}</p>
+                        </div>
+                      </li>
+                    </Button>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+export default GroupInfo;

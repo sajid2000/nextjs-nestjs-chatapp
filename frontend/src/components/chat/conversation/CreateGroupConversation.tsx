@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import LoadingButton from "@/components/LoadingButton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -17,23 +18,26 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import ImageUpload from "@/components/upload/ImageUpload";
 import { ApplicationError, ValidationError } from "@/lib/errors";
+import { socket } from "@/lib/socket";
 import { useContactList } from "@/services/contactService";
-import { CreateGroupDto, createGroupSchema, useCreateGroup } from "@/services/groupService";
+import {
+  CreateGroupConversationDto,
+  createGroupConversationSchema,
+  useCreateGroupConversation,
+} from "@/services/conversationService";
 
-import LoadingButton from "../LoadingButton";
-import { Input } from "../ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import ImageUpload from "../upload/ImageUpload";
-
-const CreateGroup: React.FC = () => {
+const CreateGroupConversation: React.FC = () => {
   const [open, setOpen] = useState(false);
 
   const { data: users } = useContactList();
-  const { mutateAsync: createGroup } = useCreateGroup();
+  const { mutateAsync: createGroupConversation } = useCreateGroupConversation();
 
-  const form = useForm<CreateGroupDto>({
-    resolver: zodResolver(createGroupSchema),
+  const form = useForm<CreateGroupConversationDto>({
+    resolver: zodResolver(createGroupConversationSchema),
     defaultValues: {
       name: "",
       image: "",
@@ -41,12 +45,17 @@ const CreateGroup: React.FC = () => {
     },
   });
 
-  const handleSubmit = async (data: CreateGroupDto) => {
+  const handleSubmit = async (data: CreateGroupConversationDto) => {
     try {
-      const res = await createGroup(data);
+      const res = await createGroupConversation(data);
 
-      if (res.data) {
-        console.log(res.data.conversationId);
+      if (res.data.id) {
+        socket.volatile.emit("groupConversationCreated", {
+          conversationId: res.data.id,
+          groupId: res.data.groupId,
+        });
+
+        setOpen(false);
       }
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -179,4 +188,4 @@ const CreateGroup: React.FC = () => {
   );
 };
 
-export default CreateGroup;
+export default CreateGroupConversation;

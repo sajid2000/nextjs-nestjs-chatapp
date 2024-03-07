@@ -11,9 +11,10 @@ import { socket } from "@/lib/socket";
 
 interface Props {
   sendMessage: (textMessage: string) => void;
+  isGroup: boolean;
 }
 
-export default function ChatBoxFooter({ sendMessage }: Props) {
+export default function ChatBoxFooter({ sendMessage, isGroup }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
   const conversationId = parseInt(searchParams.get("conversation") ?? "");
@@ -46,7 +47,7 @@ export default function ChatBoxFooter({ sendMessage }: Props) {
   };
 
   useEffect(() => {
-    if (!conversationId || !isMounted) return;
+    if (!conversationId || !isMounted || isGroup) return;
 
     if (message.length > 0) {
       socket.volatile.emit("messageTypingStart", { conversationId });

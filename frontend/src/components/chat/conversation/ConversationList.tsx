@@ -1,19 +1,33 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import CreateGroup from "@/components/group/CreateGroup";
 import { ServerToClientEvents, socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
-import { ConversationThread, useConversationListQuery } from "@/services/conversationService";
+import { ConversationThread, useThreadListQuery } from "@/services/conversationService";
 
 import ConversationListItem from "./ConversationListItem";
 import ConversationListSkeleton from "./ConversationListSkeleton";
+import CreateGroupConversation from "./CreateGroupConversation";
 
 export default function ConversationList() {
+  const searchParams = useSearchParams();
+  const conversationId = parseInt(searchParams.get("conversation") ?? "");
+
   const [conversationList, setConversationList] = useState<ConversationThread[]>([]);
 
-  const { data, isLoading } = useConversationListQuery();
+  const { data, isLoading } = useThreadListQuery();
+
+  const onNewConversation: ServerToClientEvents["newConversation"] = useCallback((payload) => {
+    const { id, name, avatar, isGroup, isOnline, lastSeen, participantOrGroupId } = payload;
+
+    setConversationList((v) => {
+      return [{ id, name, avatar, isGroup, isOnline, lastSeen, participantOrGroupId }, ...v.filter((i) => i.id !== id)];
+    });
+
+    socket.volatile.emit("joinConversation", { conversationId: id });
+  }, []);
 
   const onMessageReceived: ServerToClientEvents["messageReceived"] = useCallback((payload) => {
     const { conversation, message, sender } = payload;
@@ -33,42 +47,44 @@ export default function ConversationList() {
   const onUserConnected: ServerToClientEvents["userConnected"] = useCallback((payload) => {
     const { userId } = payload;
     setConversationList((v) => {
-      const updatedConversation = v.find((i) => i.participantOrGroupId === userId);
+      return v.map((i) => {
+        if (i.participantOrGroupId !== userId) return i;
 
-      if (!updatedConversation) return v;
-
-      return [{ ...updatedConversation, isOnline: true }, ...v.filter((i) => i.id !== updatedConversation.id)];
+        return { ...i, isOnline: true };
+      });
     });
   }, []);
 
   const onUserDisconnected: ServerToClientEvents["userDisconnected"] = useCallback((payload) => {
     const { userId, lastSeen } = payload;
     setConversationList((v) => {
-      const updatedConversation = v.find((i) => i.participantOrGroupId === userId);
+      return v.map((i) => {
+        if (i.participantOrGroupId !== userId) return i;
 
-      if (!updatedConversation) return v;
-
-      return [{ ...updatedConversation, lastSeen, isOnline: false }, ...v.filter((i) => i.id !== updatedConversation.id)];
+        return { ...i, isOnline: false, lastSeen };
+      });
     });
   }, []);
 
   useEffect(() => {
-    if (isLoading || !data || data.length === 0) return;
+    if (isLoading) return;
 
-    setConversationList(data);
+    setConversationList(data ?? []);
   }, [JSON.stringify(data)]);
 
   useEffect(() => {
+    socket.on("newConversation", onNewConversation);
     socket.on("messageReceived", onMessageReceived);
     socket.on("userConnected", onUserConnected);
     socket.on("userDisconnected", onUserDisconnected);
 
     return () => {
+      socket.off("newConversation", onNewConversation);
       socket.off("messageReceived", onMessageReceived);
       socket.off("userConnected", onUserConnected);
       socket.off("userDisconnected", onUserDisconnected);
     };
-  }, [onMessageReceived, onUserConnected, onUserDisconnected]);
+  }, [onNewConversation, onMessageReceived, onUserConnected, onUserDisconnected]);
 
   if (isLoading) return <ConversationListSkeleton />;
 
@@ -80,12 +96,12 @@ export default function ConversationList() {
           <span className="">({conversationList.length})</span>
         </div>
         <div>
-          <CreateGroup />
+          <CreateGroupConversation />
         </div>
       </div>
       <nav className={cn("flex flex-col gap-2")}>
         {conversationList.map((conversation) => (
-          <ConversationListItem key={conversation.id} conversation={conversation} />
+          <ConversationListItem key={conversation.id} conversation={conversation} active={conversation.id === conversationId} />
         ))}
       </nav>
     </div>

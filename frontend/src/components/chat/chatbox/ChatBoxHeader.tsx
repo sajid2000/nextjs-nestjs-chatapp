@@ -9,13 +9,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ServerToClientEvents, socket } from "@/lib/socket";
-import { Conversation, useConversationQuery } from "@/services/conversationService";
+import { ConversationThread, useConversationQuery } from "@/services/conversationService";
+
+import ContactInfo from "../ContactInfo";
+import GroupInfo from "../GroupInfo";
 
 export default function ChatBoxHeader() {
   const searchParams = useSearchParams();
   const conversationId = parseInt(searchParams.get("conversation") ?? "");
 
-  const [conversation, setConversation] = useState<Conversation>();
+  const [conversation, setConversation] = useState<ConversationThread>();
 
   const { data, isLoading } = useConversationQuery(conversationId);
 
@@ -87,11 +90,14 @@ export default function ChatBoxHeader() {
 
   return (
     <div className="flex h-20 w-full items-center justify-between border-b p-4">
-      <div className="flex items-center gap-2">
-        <Avatar className="flex items-center justify-center">
-          <AvatarImage src={conversation.avatar ?? ""} alt={conversation.name} width={6} height={6} className="size-10 " />
-          <AvatarFallback>{conversation.name.slice(0, 1)}</AvatarFallback>
-        </Avatar>
+      <div className="relative flex items-center gap-2">
+        <div className="relative">
+          <Avatar className="flex items-center justify-center">
+            <AvatarImage src={conversation.avatar ?? ""} alt={conversation.name} width={6} height={6} className="size-10 " />
+            <AvatarFallback>{conversation.name.slice(0, 1)}</AvatarFallback>
+          </Avatar>
+          {conversation.isOnline && <span className="absolute bottom-0 right-1 size-2 rounded-full bg-indigo-600"></span>}
+        </div>
         <div className="flex flex-col">
           <span className="font-medium">{conversation.name}</span>
           <span className="text-xs">
@@ -100,13 +106,20 @@ export default function ChatBoxHeader() {
         </div>
       </div>
 
-      <div className="space-x-2">
-        <Button size={"icon"} variant={"secondary"} className="rounded-full">
-          <PhoneIcon size={20} />
-        </Button>
-        <Button size={"icon"} variant={"secondary"} className="rounded-full">
-          <VideoIcon size={20} />
-        </Button>
+      <div className="flex items-center gap-2">
+        {!data?.isGroup ? (
+          <>
+            <Button size={"icon"} variant={"secondary"} className="rounded-full">
+              <PhoneIcon size={20} />
+            </Button>
+            <Button size={"icon"} variant={"secondary"} className="rounded-full">
+              <VideoIcon size={20} />
+            </Button>
+            <ContactInfo contactId={conversation.participantOrGroupId} />
+          </>
+        ) : (
+          <GroupInfo conversationId={conversationId} />
+        )}
       </div>
     </div>
   );

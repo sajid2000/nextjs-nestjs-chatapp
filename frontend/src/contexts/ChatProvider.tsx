@@ -59,6 +59,14 @@ const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
     socket.onAny((ev) => console.log(ev));
 
+    socket.on("exception", (error) => {
+      console.log(error);
+
+      if (error.message) {
+        return toast.error(error.message);
+      }
+    });
+
     socket.on("connect_error", async (err) => {
       if (err?.message === "Unauthorized") {
         await axios.post("auth/signout");
@@ -66,6 +74,8 @@ const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         router.push(AUTH_URI.signIn);
         router.refresh();
       }
+
+      console.log(err);
     });
 
     return () => {

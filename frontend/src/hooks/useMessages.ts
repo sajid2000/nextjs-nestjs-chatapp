@@ -26,12 +26,13 @@ export default function useMessages(conversationId?: number) {
       if (conversation.id !== conversationId) return;
 
       setMessages((v) => [
-        ...v.filter((i) => i.id !== message.id),
         {
           ...message,
           conversationId: conversation.id,
           senderId: sender.id,
+          sender,
         },
+        ...v.filter((i) => i.id !== message.id),
       ]);
     },
     [conversationId]

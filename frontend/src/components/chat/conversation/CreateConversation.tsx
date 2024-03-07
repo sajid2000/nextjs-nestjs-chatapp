@@ -3,11 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import CreateContact from "@/components/contact/CreateContact";
+import CreateContact from "@/components/chat/conversation/CreateContact";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { socket } from "@/lib/socket";
 import { useContactList } from "@/services/contactService";
-import { useStartConversation } from "@/services/conversationService";
+import { useCreateConversation } from "@/services/conversationService";
 
 type Props = {
   trigger: React.ReactNode;
@@ -17,16 +18,15 @@ const CreateConversation: React.FC<Props> = ({ trigger }) => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const { data, isLoading } = useContactList();
-  const { mutateAsync: startConversation } = useStartConversation();
+  const { data } = useContactList();
+  const { mutateAsync: startConversation } = useCreateConversation();
 
   const handleStartConversation = async (contactId: number) => {
     try {
       const res = await startConversation({ contactId, isGroup: false });
 
       if (res.data.id) {
-        router.push(`/?conversation=${res.data.id}`);
-        setOpen(false);
+        socket.volatile.emit("privateConversationCreated", { contactId, conversationId: res.data.id });
       }
     } catch (error) {
       console.log(error);

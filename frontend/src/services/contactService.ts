@@ -5,6 +5,8 @@ import axios from "@/lib/axios";
 import { queryClient } from "@/lib/queryClient";
 import { MyMutationOptions, MyQueryOptions } from "@/types";
 
+import { ConversationThread } from "./conversationService";
+
 export type Contact = {
   id: number;
   fullName: string;
@@ -37,4 +39,12 @@ export function useCreateContact(options?: MyMutationOptions<any, CreateContactD
     onSuccess: invalidateContactList,
     ...options,
   });
+}
+
+export function useContactInfo(id?: number, options?: MyQueryOptions<Contact>) {
+  return useQuery({ queryKey: [`users/${id}`], enabled: !!id, ...options });
+}
+
+export function useConversationByContactQuery(contactId?: number, options?: MyQueryOptions<ConversationThread>) {
+  return useQuery({ queryKey: [`${API_ENDPOINT}/${contactId}/conversation`], enabled: !!contactId, ...options });
 }

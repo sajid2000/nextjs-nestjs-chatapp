@@ -1,11 +1,11 @@
 import { io, Socket } from "socket.io-client";
 
+import { ConversationThread } from "@/services/conversationService";
 import { MessageResponsePayload, MessageSendRequestPayload } from "@/services/messageService";
-
-type CB = (data: unknown) => void;
 
 export interface ServerToClientEvents {
   // message
+  newConversation: (data: ConversationThread) => void;
   messageReceived: (data: MessageResponsePayload) => void;
   messageDelivered: (data: { conversationId: number }) => void;
   messageSeen: (data: { conversationId: number }) => void;
@@ -13,15 +13,19 @@ export interface ServerToClientEvents {
   userDisconnected: (data: { userId: number; lastSeen: Date }) => void;
   messageTypingStart: (data: { conversationId: number; receiverId: number }) => void;
   messageTypingStop: (data: { conversationId: number; receiverId: number }) => void;
+  exception: (data: any) => void;
 }
 
 export interface ClientToServerEvents {
   // message
-  messageSend: (data: MessageSendRequestPayload, cb?: CB) => void;
-  messageDelivered: (data: { conversationId: number }, cb?: CB) => void;
-  messageSeen: (data: { conversationId: number }, cb?: CB) => void;
-  messageTypingStart: (data: { conversationId: number }, cb?: CB) => void;
-  messageTypingStop: (data: { conversationId: number }, cb?: CB) => void;
+  privateConversationCreated: (data: { conversationId: number; contactId: number }) => void;
+  groupConversationCreated: (data: { conversationId: number; groupId: number }) => void;
+  joinConversation: (data: { conversationId: number }) => void;
+  messageSend: (data: MessageSendRequestPayload) => void;
+  messageDelivered: (data: { conversationId: number }) => void;
+  messageSeen: (data: { conversationId: number }) => void;
+  messageTypingStart: (data: { conversationId: number }) => void;
+  messageTypingStop: (data: { conversationId: number }) => void;
 }
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:4000", {

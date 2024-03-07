@@ -7,7 +7,30 @@ import { MyMutationOptions, MyQueryOptions } from "@/types";
 
 import { IMessage } from "./messageService";
 
-export type Conversation = {
+type Conversation = {
+  id: number;
+  isGroup: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type GroupInfo = {
+  id: number;
+  conversationId: number;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  image: string | null;
+  creator: number | null;
+  members: {
+    id: number;
+    fullName: string;
+    phone: number;
+    avatar: string | null;
+  }[];
+};
+
+export type ConversationThread = {
   id: number;
   participantOrGroupId: number;
   name: string;
@@ -15,16 +38,21 @@ export type Conversation = {
   isGroup: boolean;
   lastSeen: Date;
   isOnline: boolean;
+  lastMessage?: Omit<IMessage, "conversationId" | "replyId" | "sender">;
 };
-
-export type ConversationThread = Conversation & { lastMessage?: Omit<IMessage, "conversationId" | "replyId"> };
 
 export const createConversationSchema = z.object({
   contactId: z.number(),
   isGroup: z.boolean(),
 });
-
 export type CreateConversationDto = z.output<typeof createConversationSchema>;
+
+export const createGroupConversationSchema = z.object({
+  name: z.string().min(2),
+  image: z.string().optional(),
+  members: z.number().array().nonempty(),
+});
+export type CreateGroupConversationDto = z.output<typeof createGroupConversationSchema>;
 
 const API_ENDPOINT = "/conversations";
 
@@ -33,17 +61,45 @@ export const invalidateConversationList = () =>
     queryKey: [API_ENDPOINT],
   });
 
-export function useConversationQuery(id?: number, options?: MyQueryOptions<Conversation>) {
+export function useConversationQuery(id?: number, options?: MyQueryOptions<ConversationThread>) {
   return useQuery({ queryKey: [`${API_ENDPOINT}/${id}`], enabled: !!id, ...options });
 }
 
-export function useConversationListQuery(options?: MyQueryOptions<ConversationThread[]>) {
+export function useThreadListQuery(options?: MyQueryOptions<ConversationThread[]>) {
   return useQuery({ queryKey: [API_ENDPOINT], ...options });
 }
 
-export function useStartConversation(options?: MyMutationOptions<any, CreateConversationDto>) {
+export function useCreateConversation(options?: MyMutationOptions<any, CreateConversationDto>) {
   return useMutation({
     mutationFn: (dto) => axios.post<Conversation>(`${API_ENDPOINT}/private`, dto),
+    onSuccess: invalidateConversationList,
+    ...options,
+  });
+}
+
+export function useCreateGroupConversation(options?: MyMutationOptions<any, CreateGroupConversationDto>) {
+  return useMutation({
+    mutationFn: (dto) => axios.post<Conversation & { groupId: number }>(`${API_ENDPOINT}/group`, dto),
+    onSuccess: invalidateConversationList,
+    ...options,
+  });
+}
+
+export function useGroupConversationInfo(id?: number, options?: MyQueryOptions<GroupInfo>) {
+  return useQuery({ queryKey: [`${API_ENDPOINT}/${id}/groupInfo`], enabled: !!id, ...options });
+}
+
+export function useDeleteConversation(options?: MyMutationOptions<any, number>) {
+  return useMutation({
+    mutationFn: (id) => axios.delete(`${API_ENDPOINT}/${id}/force`),
+    onSuccess: invalidateConversationList,
+    ...options,
+  });
+}
+
+export function useLeaveConversation(options?: MyMutationOptions<any, number>) {
+  return useMutation({
+    mutationFn: (id) => axios.delete(`${API_ENDPOINT}/${id}`),
     onSuccess: invalidateConversationList,
     ...options,
   });

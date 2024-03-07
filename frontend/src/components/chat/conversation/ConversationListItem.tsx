@@ -8,13 +8,14 @@ import { ConversationThread } from "@/services/conversationService";
 
 type Props = {
   conversation: ConversationThread;
+  active?: boolean;
 };
 
-const ConversationListItem: React.FC<Props> = ({ conversation }) => {
+const ConversationListItem: React.FC<Props> = ({ conversation, active }) => {
   const { user } = useSession();
 
   return (
-    <Button asChild variant={"ghost"} size={"lg"} className={cn("relative h-14 justify-start gap-2 px-2")}>
+    <Button asChild variant={active ? "secondary" : "ghost"} size={"lg"} className={cn("relative h-14 justify-start gap-2 px-2")}>
       <Link href={`/?conversation=${conversation.id}`}>
         <div className="relative">
           <Avatar className="flex size-12 items-center justify-center">

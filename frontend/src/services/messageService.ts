@@ -13,6 +13,11 @@ export interface IMessage {
   messageType: "text" | "image" | "voice";
   messageStatus: "sent" | "delivered" | "seen";
   sentDate: Date;
+  sender: {
+    id: number;
+    fullName: string;
+    avatar: string | null;
+  };
 }
 
 export interface MessageTyping {
@@ -27,14 +32,14 @@ export interface MessageSendRequestPayload {
 }
 
 export interface MessageResponsePayload {
-  message: Omit<IMessage, "conversationId" | "senderId">;
+  message: Omit<IMessage, "conversationId" | "senderId" | "sender">;
   conversation: {
     id: number;
     isGroup: boolean;
   };
   sender: {
     id: number;
-    name: string;
+    fullName: string;
     avatar: string | null;
   };
 }

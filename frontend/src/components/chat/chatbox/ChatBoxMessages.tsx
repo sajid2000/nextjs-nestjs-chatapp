@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/contexts/SessionProvider";
 import useMessages from "@/hooks/useMessages";
 import { ServerToClientEvents, socket } from "@/lib/socket";
+import { useConversationQuery } from "@/services/conversationService";
 
 import ChatBoxFooter from "./ChatBoxFooter";
 import MessageItem from "./MessageItem";
@@ -22,6 +23,7 @@ export default function ChatBoxMessages() {
 
   const { user } = useSession();
   const { messages, isLoading } = useMessages(conversationId);
+  const { data: conversation } = useConversationQuery(conversationId);
 
   const sendMessage = (textMessage: string) => {
     if (!user || !conversationId) return;
@@ -79,53 +81,53 @@ export default function ChatBoxMessages() {
 
   return (
     <div className="flex size-full flex-col overflow-y-auto ">
-      <div ref={messagesContainerRef} className="flex size-full flex-col overflow-y-auto pb-2">
+      <div ref={messagesContainerRef} className="flex size-full flex-col-reverse overflow-y-auto pb-2">
         {isLoading ? (
           <MessageSkeleton />
         ) : (
           <AnimatePresence>
-            {messages
-              ?.sort((a, b) => a.id - b.id)
-              .map((message, index) => (
-                <motion.div
-                  key={index}
-                  layout
-                  initial={{ opacity: 0, scale: 1, y: 50, x: 0 }}
-                  animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                  exit={{ opacity: 0, scale: 1, y: 1, x: 0 }}
-                  transition={{
-                    opacity: { duration: 0.1 },
-                    layout: {
-                      type: "spring",
-                      bounce: 0.3,
-                      duration: messages.indexOf(message) * 0.05 + 0.2,
-                    },
-                  }}
-                  style={{
-                    originX: 0.5,
-                    originY: 0.5,
-                  }}
-                >
-                  <MessageItem
-                    own={message.senderId === user?.id}
-                    id={message.id}
-                    message={message.messageContent}
-                    sentAt={message.sentDate}
-                    status={message.messageStatus}
-                  />
-                </motion.div>
-              ))}
+            <div className={`px-4 ${isTyping ? "flex" : "hidden"}`}>
+              <div className="flex gap-1 rounded-lg bg-muted p-6 pb-4">
+                <DotFilledIcon className="animate-bounce" />
+                <DotFilledIcon className="animate-bounce delay-100" />
+                <DotFilledIcon className="animate-bounce delay-200" />
+              </div>
+            </div>
+            {messages.map((message, index) => (
+              <motion.div
+                key={index}
+                layout
+                initial={{ opacity: 0, scale: 1, y: 50, x: 0 }}
+                animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                exit={{ opacity: 0, scale: 1, y: 1, x: 0 }}
+                transition={{
+                  opacity: { duration: 0.1 },
+                  layout: {
+                    type: "spring",
+                    bounce: 0.3,
+                    duration: messages.indexOf(message) * 0.05 + 0.2,
+                  },
+                }}
+                style={{
+                  originX: 0.5,
+                  originY: 0.5,
+                }}
+              >
+                <MessageItem
+                  isGroup={conversation?.isGroup ?? true}
+                  sender={message.sender}
+                  own={message.senderId === user?.id}
+                  id={message.id}
+                  message={message.messageContent}
+                  sentAt={message.sentDate}
+                  status={message.messageStatus}
+                />
+              </motion.div>
+            ))}
           </AnimatePresence>
         )}
-        <div className={`px-4 ${isTyping ? "flex" : "hidden"}`}>
-          <div className="flex gap-1 rounded-lg bg-muted p-3 pb-2">
-            <DotFilledIcon className="animate-bounce" />
-            <DotFilledIcon className="animate-bounce delay-100" />
-            <DotFilledIcon className="animate-bounce delay-200" />
-          </div>
-        </div>
       </div>
-      <ChatBoxFooter sendMessage={sendMessage} />
+      <ChatBoxFooter isGroup={conversation?.isGroup ?? true} sendMessage={sendMessage} />
     </div>
   );
 }
