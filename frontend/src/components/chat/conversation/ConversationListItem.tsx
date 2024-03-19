@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { ConversationThread } from "@/services/conversationService";
 
 type Props = {
-  conversation: ConversationThread;
+  conversation: ConversationThread & { isTyping?: boolean };
   active?: boolean;
 };
 
@@ -27,10 +27,14 @@ const ConversationListItem: React.FC<Props> = ({ conversation, active }) => {
         <div className="overflow-hidden">
           <p className="text-lg">{conversation.name}</p>
 
-          <p className="truncate text-sm text-muted-foreground">
-            {user?.id === conversation?.lastMessage?.senderId && "You: "}
-            {conversation.lastMessage?.messageContent ?? "Start a conversation"}
-          </p>
+          {!conversation.isTyping ? (
+            <p className="truncate text-sm text-muted-foreground">
+              {user?.id === conversation?.lastMessage?.senderId && "You: "}
+              {conversation.lastMessage?.messageContent ?? "Start a conversation"}
+            </p>
+          ) : (
+            <div className="text-primary">Typing...</div>
+          )}
         </div>
       </Link>
     </Button>

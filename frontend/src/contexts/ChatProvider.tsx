@@ -31,7 +31,7 @@ const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           if (payload.message.messageType === "image") msg = "Sent an image";
           if (payload.message.messageType === "voice") msg = "Sent a voice";
 
-          toast.info(`${sender.name}: ${msg}`);
+          toast.info(`${sender.fullName}: ${msg}`);
         }
 
         if (conversation.id === conversationId) {

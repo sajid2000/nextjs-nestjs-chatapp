@@ -107,18 +107,22 @@ export default function ChatBoxHeader() {
       </div>
 
       <div className="flex items-center gap-2">
-        {!data?.isGroup ? (
+        {data && (
           <>
-            <Button size={"icon"} variant={"secondary"} className="rounded-full">
-              <PhoneIcon size={20} />
-            </Button>
-            <Button size={"icon"} variant={"secondary"} className="rounded-full">
-              <VideoIcon size={20} />
-            </Button>
-            <ContactInfo contactId={conversation.participantOrGroupId} />
+            {!data.isGroup ? (
+              <>
+                <Button size={"icon"} variant={"secondary"} className="rounded-full">
+                  <PhoneIcon size={20} />
+                </Button>
+                <Button size={"icon"} variant={"secondary"} className="rounded-full">
+                  <VideoIcon size={20} />
+                </Button>
+                <ContactInfo conversationId={data.id} contactId={conversation.participantOrGroupId} />
+              </>
+            ) : (
+              <GroupInfo conversationId={conversationId} />
+            )}
           </>
-        ) : (
-          <GroupInfo conversationId={conversationId} />
         )}
       </div>
     </div>

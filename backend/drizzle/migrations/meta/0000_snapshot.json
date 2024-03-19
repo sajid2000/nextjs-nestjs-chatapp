@@ -1,5 +1,5 @@
 {
-  "id": "d36039ed-d11a-4ac2-b68e-1b348b86a9a8",
+  "id": "16a4d703-165a-460f-955e-d0b677bbf32e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "5",
   "dialect": "pg",
@@ -174,63 +174,6 @@
           "columns": [
             "groupId",
             "userId"
-          ]
-        }
-      },
-      "uniqueConstraints": {}
-    },
-    "groupToConversation": {
-      "name": "groupToConversation",
-      "schema": "",
-      "columns": {
-        "conversationId": {
-          "name": "conversationId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "groupId": {
-          "name": "groupId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "groupToConversation_conversationId_conversation_id_fk": {
-          "name": "groupToConversation_conversationId_conversation_id_fk",
-          "tableFrom": "groupToConversation",
-          "tableTo": "conversation",
-          "columnsFrom": [
-            "conversationId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "groupToConversation_groupId_group_id_fk": {
-          "name": "groupToConversation_groupId_group_id_fk",
-          "tableFrom": "groupToConversation",
-          "tableTo": "group",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "groupToConversation_groupId_conversationId_pk": {
-          "name": "groupToConversation_groupId_conversationId_pk",
-          "columns": [
-            "groupId",
-            "conversationId"
           ]
         }
       },

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { CreateMessageDto, UpdateMessageDto } from "../dto/message.dto";
 import { MessageEntity } from "../entities/message.entity";
@@ -16,14 +16,16 @@ export class MessageService {
   async getMessagesByConversationId(userId: number, conversationId: number, filter: MessageQueryParams) {
     const { limit, cursor } = filter;
 
-    const conversation = await this.conversationService.getConversationOfUser({ userId, conversationId });
+    if (!(await this.conversationService.isMemberOfConversation({ userId, conversationId }))) {
+      throw new NotFoundException();
+    }
 
-    const result = await this.messageRepository.getAllMessageByConversation(conversation.id, filter);
+    const result = await this.messageRepository.getAllMessageByConversation(conversationId, filter);
 
     return {
       limit,
       nextCursor: result[result.length - 1]?.id ?? null,
-      prevCursor: cursor ?? null,
+      prevCursor: cursor ? Number(cursor) : null,
       result: result.map((i) => new MessageEntity(i)),
     };
   }
@@ -43,7 +45,9 @@ export class MessageService {
   }
 
   async updateStatus(userId: number, dto: UpdateMessageDto) {
-    await this.conversationService.getConversationOfUser({ userId, conversationId: dto.conversationId });
+    if (!(await this.conversationService.isMemberOfConversation({ userId, conversationId: dto.conversationId }))) {
+      throw new NotFoundException();
+    }
 
     return await this.messageRepository.updateStatus(dto);
   }

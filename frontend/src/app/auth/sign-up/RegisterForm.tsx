@@ -18,9 +18,9 @@ const RegisterForm = () => {
     resolver: zodResolver(RegisterSchema),
     defaultValues: {
       avatar: "",
-      fullName: "Jhon Doe",
-      phone: 123123123,
-      password: "123456",
+      fullName: "",
+      phone: undefined,
+      password: "",
     },
   });
 

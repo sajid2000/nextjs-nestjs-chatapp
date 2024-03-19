@@ -21,12 +21,6 @@ CREATE TABLE IF NOT EXISTS "groupMember" (
 	CONSTRAINT "groupMember_groupId_userId_pk" PRIMARY KEY("groupId","userId")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "groupToConversation" (
-	"conversationId" integer NOT NULL,
-	"groupId" integer NOT NULL,
-	CONSTRAINT "groupToConversation_groupId_conversationId_pk" PRIMARY KEY("groupId","conversationId")
-);
---> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "message" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"messageContent" text NOT NULL,
@@ -85,18 +79,6 @@ END $$;
 --> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "groupMember" ADD CONSTRAINT "groupMember_groupId_group_id_fk" FOREIGN KEY ("groupId") REFERENCES "group"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
---> statement-breakpoint
-DO $$ BEGIN
- ALTER TABLE "groupToConversation" ADD CONSTRAINT "groupToConversation_conversationId_conversation_id_fk" FOREIGN KEY ("conversationId") REFERENCES "conversation"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
---> statement-breakpoint
-DO $$ BEGIN
- ALTER TABLE "groupToConversation" ADD CONSTRAINT "groupToConversation_groupId_group_id_fk" FOREIGN KEY ("groupId") REFERENCES "group"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;

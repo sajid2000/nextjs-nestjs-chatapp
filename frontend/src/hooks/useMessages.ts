@@ -1,22 +1,37 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import qs from "query-string";
 import { useCallback, useEffect, useState } from "react";
 
 import axios from "@/lib/axios";
 import { ServerToClientEvents, socket } from "@/lib/socket";
+import { wait } from "@/lib/utils";
 import { IMessage } from "@/services/messageService";
 import { PaginatedResource } from "@/types";
 
-const MESSAGE_QUERY_LIMIT = 10;
-
-export default function useMessages(conversationId?: number) {
-  const [cursor, setCursor] = useState("");
-  const [nextCursor, setNextCursor] = useState("");
+export default function useMessages({ limit, conversationId }: { conversationId?: number; limit: number }) {
   const [messages, setMessages] = useState<IMessage[]>([]);
 
-  const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: [`/conversations/${conversationId}/messages?&limit=${MESSAGE_QUERY_LIMIT}${cursor ? `&cursor=${cursor}` : ""}`],
-    queryFn: ({ queryKey }) => axios.get<PaginatedResource<IMessage[]>>(queryKey[0]).then((data) => data.data),
+  const fetchMessages = async ({ pageParam = undefined }) => {
+    await wait(1000);
+    const url = qs.stringifyUrl(
+      {
+        url: `/conversations/${conversationId}/messages`,
+        query: { limit, cursor: pageParam },
+      },
+      { skipNull: true }
+    );
+
+    return axios.get<PaginatedResource<IMessage[]>>(url).then((data) => data.data);
+  };
+
+  // @ts-ignore
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
+    queryKey: ["messages", conversationId],
+    queryFn: fetchMessages,
+    getNextPageParam: (lastPage) => lastPage?.nextCursor,
+    initialPageParam: null,
     enabled: !!conversationId,
+    gcTime: 1000,
   });
 
   const onMessageReceived: ServerToClientEvents["messageReceived"] = useCallback(
@@ -32,7 +47,7 @@ export default function useMessages(conversationId?: number) {
           senderId: sender.id,
           sender,
         },
-        ...v.filter((i) => i.id !== message.id),
+        ...v,
       ]);
     },
     [conversationId]
@@ -62,10 +77,13 @@ export default function useMessages(conversationId?: number) {
   );
 
   useEffect(() => {
-    if (data) {
-      setMessages(data.result);
-      setNextCursor(data.nextCursor?.toString() || "");
-    }
+    if (!data) return;
+
+    setMessages(
+      data.pages.reduce((acc, page) => {
+        return [...acc, ...page.result];
+      }, [] as IMessage[])
+    );
   }, [data]);
 
   useEffect(() => {
@@ -80,5 +98,5 @@ export default function useMessages(conversationId?: number) {
     };
   }, [onMessageReceived, onMessageDelivered, onMessageSeen]);
 
-  return { messages, isLoading, isFetching, nextCursor, setCursor, error };
+  return { messages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading };
 }

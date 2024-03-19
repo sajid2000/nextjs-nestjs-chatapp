@@ -8,8 +8,6 @@ const envSchema = z.object({
   APP_TIMEZONE: z.string().min(2),
   APP_LOCALE: z.string().min(2),
   SERVER_PORT: z.coerce.number(),
-  NEXT_PUBLIC_APP_NAME: z.string().min(2),
-  NEXT_PUBLIC_APP_URL: z.string().url(),
   // db
   DB_URL: z.string().min(2),
   DB_DRIVER: z.enum(["mysql2", "pg"]),

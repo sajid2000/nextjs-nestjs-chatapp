@@ -1,10 +1,22 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 
 import { JWTAuthGuard } from "@/auth/guards/jwt-auth.guard";
 
-import { CreateConversationDto } from "../dto/conversation.dto";
 import { CreateGroupDto } from "../dto/group.dto";
 import { ConversationService } from "../services/conversation.service";
+import { GroupService } from "../services/group.service";
 import { MessageService } from "../services/message.service";
 import { MessageQueryParams } from "../types";
 
@@ -13,6 +25,7 @@ import { MessageQueryParams } from "../types";
 export class ConversationController {
   constructor(
     private readonly conversationService: ConversationService,
+    private readonly groupService: GroupService,
     private readonly messageService: MessageService
   ) {}
 
@@ -32,27 +45,27 @@ export class ConversationController {
   }
 
   @Get(":id/groupInfo")
-  async getGroupConversationInfo(@Req() req: Request, @Param("id", ParseIntPipe) id: number) {
-    return this.conversationService.getGroupConversationInfo({ userId: req.user.id, conversationId: id });
+  async getGroupInfo(@Req() req: Request, @Param("id", ParseIntPipe) id: number) {
+    return this.conversationService.getGroupInfo({ userId: req.user.id, conversationId: id });
   }
 
   @Get(":id/member/:memberId")
-  async getGroupConversationMemberInfo(
+  async getGroupMemberInfo(
     @Req() req: Request,
     @Param("id", ParseIntPipe) id: number,
     @Param("memberId", ParseIntPipe) memberId: number
   ) {
-    return this.conversationService.getGroupMemberInfo(req.user.id, { memberId, conversationId: id });
+    const group = await this.groupService.getByConversationId(id);
+    const isUserMemberOfGroup = await this.groupService.isGroupMember({ groupId: group.id, userId: req.user.id });
+
+    if (!isUserMemberOfGroup) throw new NotFoundException();
+
+    return this.conversationService.getGroupMember({ memberId, groupId: group.id });
   }
 
   @Get(":id/messages")
   async getConversationMessages(@Req() req: Request, @Param("id", ParseIntPipe) id: number, @Query() query: MessageQueryParams) {
     return this.messageService.getMessagesByConversationId(req.user.id, id, query);
-  }
-
-  @Post("private")
-  async createPrivateConversation(@Req() req: Request, @Body() dto: CreateConversationDto) {
-    return this.conversationService.createPrivateConversation({ ...dto, userId: req.user.id });
   }
 
   @Post("group")
@@ -62,11 +75,11 @@ export class ConversationController {
 
   @Delete(":id")
   async removeConversation(@Req() req: Request, @Param("id", ParseIntPipe) id: number) {
-    return this.conversationService.removeUserConversation({ userId: req.user.id, conversationId: id });
+    return this.conversationService.softDeleteUserConversation({ userId: req.user.id, conversationId: id });
   }
 
-  @Delete(":id/force")
-  async deleteGroupConversation(@Req() req: Request, @Param("id", ParseIntPipe) id: number) {
-    return this.conversationService.deleteGroupConversation({ userId: req.user.id, conversationId: id });
+  @Delete("group/:groupId")
+  async deleteGroup(@Req() req: Request, @Param("groupId", ParseIntPipe) groupId: number) {
+    return this.conversationService.deleteGroup({ userId: req.user.id, groupId });
   }
 }

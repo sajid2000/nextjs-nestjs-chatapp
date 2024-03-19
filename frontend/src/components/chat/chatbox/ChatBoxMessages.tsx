@@ -1,7 +1,7 @@
 "use client";
 
 import { DotFilledIcon } from "@radix-ui/react-icons";
-import { AnimatePresence, motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -14,15 +14,25 @@ import ChatBoxFooter from "./ChatBoxFooter";
 import MessageItem from "./MessageItem";
 import MessageSkeleton from "./MessageSkeleton";
 
+const MESSAGE_QUERY_LIMIT = 10;
+
+let pauseScroll = false;
+
 export default function ChatBoxMessages() {
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const conversationId = parseInt(searchParams.get("conversation") ?? "");
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef<HTMLDivElement>(null);
+
   const [isTyping, setIsTyping] = useState(false);
+  const [isInTop, setIsInTop] = useState(false);
 
   const { user } = useSession();
-  const { messages, isLoading } = useMessages(conversationId);
+  const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages({
+    conversationId,
+    limit: MESSAGE_QUERY_LIMIT,
+  });
   const { data: conversation } = useConversationQuery(conversationId);
 
   const sendMessage = (textMessage: string) => {
@@ -37,6 +47,8 @@ export default function ChatBoxMessages() {
 
   const onMessageTypingStart: ServerToClientEvents["messageTypingStart"] = useCallback(
     (payload) => {
+      pauseScroll = false;
+
       if (conversationId === payload.conversationId) {
         setIsTyping(true);
       }
@@ -46,6 +58,8 @@ export default function ChatBoxMessages() {
 
   const onMessageTypingStop: ServerToClientEvents["messageTypingStop"] = useCallback(
     (payload) => {
+      pauseScroll = false;
+
       if (conversationId === payload.conversationId) {
         setIsTyping(false);
       }
@@ -54,16 +68,29 @@ export default function ChatBoxMessages() {
   );
 
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !isLoading) {
+        pauseScroll = true;
+
+        setIsInTop(true);
+      }
+    });
+
+    scrollTopRef.current && observer.observe(scrollTopRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isLoading]);
 
   useEffect(() => {
-    if (messagesContainerRef.current && isTyping) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    if (isInTop && hasNextPage && !isFetchingNextPage) {
+      pauseScroll = true;
+
+      fetchNextPage();
+      setIsInTop(false);
     }
-  }, [isTyping]);
+  }, [isInTop, hasNextPage, isFetchingNextPage]);
 
   useEffect(() => {
     socket.on("messageTypingStart", onMessageTypingStart);
@@ -76,6 +103,12 @@ export default function ChatBoxMessages() {
   }, [onMessageTypingStart, onMessageTypingStop]);
 
   useEffect(() => {
+    if (messagesContainerRef.current && (!pauseScroll || isTyping)) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages, isTyping]);
+
+  useEffect(() => {
     socket.volatile.emit("messageSeen", { conversationId });
   }, []);
 
@@ -85,34 +118,16 @@ export default function ChatBoxMessages() {
         {isLoading ? (
           <MessageSkeleton />
         ) : (
-          <AnimatePresence>
-            <div className={`px-4 ${isTyping ? "flex" : "hidden"}`}>
+          <>
+            <div key="bottom" className={`px-4 ${isTyping ? "flex" : "hidden"}`}>
               <div className="flex gap-1 rounded-lg bg-muted p-6 pb-4">
                 <DotFilledIcon className="animate-bounce" />
                 <DotFilledIcon className="animate-bounce delay-100" />
                 <DotFilledIcon className="animate-bounce delay-200" />
               </div>
             </div>
-            {messages.map((message, index) => (
-              <motion.div
-                key={index}
-                layout
-                initial={{ opacity: 0, scale: 1, y: 50, x: 0 }}
-                animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                exit={{ opacity: 0, scale: 1, y: 1, x: 0 }}
-                transition={{
-                  opacity: { duration: 0.1 },
-                  layout: {
-                    type: "spring",
-                    bounce: 0.3,
-                    duration: messages.indexOf(message) * 0.05 + 0.2,
-                  },
-                }}
-                style={{
-                  originX: 0.5,
-                  originY: 0.5,
-                }}
-              >
+            {messages.map((message) => (
+              <div key={message.id}>
                 <MessageItem
                   isGroup={conversation?.isGroup ?? true}
                   sender={message.sender}
@@ -122,9 +137,15 @@ export default function ChatBoxMessages() {
                   sentAt={message.sentDate}
                   status={message.messageStatus}
                 />
-              </motion.div>
+              </div>
             ))}
-          </AnimatePresence>
+            <div key="top" className="flex min-h-12 items-center justify-center py-1">
+              <div ref={messages.length < MESSAGE_QUERY_LIMIT ? null : scrollTopRef}>
+                {hasNextPage && isFetchingNextPage && <Loader2 className="size-6 animate-spin" />}
+                {!hasNextPage && messages.length > MESSAGE_QUERY_LIMIT && <div>No more messages</div>}
+              </div>
+            </div>
+          </>
         )}
       </div>
       <ChatBoxFooter isGroup={conversation?.isGroup ?? true} sendMessage={sendMessage} />

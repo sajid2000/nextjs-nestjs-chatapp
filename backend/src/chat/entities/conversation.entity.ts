@@ -2,7 +2,7 @@ import { Exclude } from "class-transformer";
 
 import { MessageEntity } from "./message.entity";
 
-export class ThreadEntity {
+export class ConversationEntity {
   id: number;
 
   participantOrGroupId: number;
@@ -22,7 +22,7 @@ export class ThreadEntity {
 
   lastMessage?: Omit<MessageEntity, "conversationId" | "replyId">;
 
-  constructor(items: ThreadEntity) {
+  constructor(items: ConversationEntity) {
     Object.assign(this, items);
   }
 }

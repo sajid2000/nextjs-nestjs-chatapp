@@ -54,7 +54,7 @@ export default function ChatBoxFooter({ sendMessage, isGroup }: Props) {
     } else {
       socket.volatile.emit("messageTypingStop", { conversationId });
     }
-  }, [message]);
+  }, [message, isMounted]);
 
   useEffect(() => {
     setIsMounted(true);

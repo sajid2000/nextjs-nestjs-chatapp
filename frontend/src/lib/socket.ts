@@ -9,6 +9,7 @@ export interface ServerToClientEvents {
   messageReceived: (data: MessageResponsePayload) => void;
   messageDelivered: (data: { conversationId: number }) => void;
   messageSeen: (data: { conversationId: number }) => void;
+  bannedFromGroup: (data: { conversationId: number }) => void;
   userConnected: (data: { userId: number; name: string; phone: string }) => void;
   userDisconnected: (data: { userId: number; lastSeen: Date }) => void;
   messageTypingStart: (data: { conversationId: number; receiverId: number }) => void;
@@ -18,9 +19,11 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   // message
-  privateConversationCreated: (data: { conversationId: number; contactId: number }) => void;
+  createPrivateConversation: (data: { contactId: number }) => void;
   groupConversationCreated: (data: { conversationId: number; groupId: number }) => void;
   joinConversation: (data: { conversationId: number }) => void;
+  leaveConversation: (data: { conversationId: number }) => void;
+  kickGroupMember: (data: { conversationId: number; memberId: number }) => void;
   messageSend: (data: MessageSendRequestPayload) => void;
   messageDelivered: (data: { conversationId: number }) => void;
   messageSeen: (data: { conversationId: number }) => void;

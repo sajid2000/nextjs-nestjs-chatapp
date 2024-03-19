@@ -1,4 +1,4 @@
-export class GroupInfoEntity {
+export class GroupEntity {
   id: number;
 
   conversationId: number;
@@ -20,7 +20,7 @@ export class GroupInfoEntity {
     avatar: string | null;
   }[];
 
-  constructor(items: GroupInfoEntity) {
+  constructor(items: GroupEntity) {
     Object.assign(this, items);
   }
 }

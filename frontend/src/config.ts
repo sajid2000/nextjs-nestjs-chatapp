@@ -12,7 +12,6 @@ export const siteConfig = {
   language: "en-us",
   locale: "en-US",
   appName: env.NEXT_PUBLIC_APP_NAME || "Chat App",
-  appUrl: env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   apiUrl: env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
   copywriteYears: currentYear === websiteLaunchYear ? currentYear : `${websiteLaunchYear}-${currentYear}`,
 };

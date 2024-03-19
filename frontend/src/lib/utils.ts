@@ -9,3 +9,20 @@ export function cn(...inputs: ClassValue[]) {
 export function formatTime(date: Date) {
   return format(date, "hh:mm aa");
 }
+
+let throttleTimer: any;
+
+export const throttle = (cb: () => unknown, time: number) => {
+  if (throttleTimer) return;
+
+  throttleTimer = true;
+
+  setTimeout(() => {
+    cb();
+    throttleTimer = false;
+  }, time);
+};
+
+export const wait = (time: number) => {
+  return new Promise((resolve) => setTimeout(() => resolve(true), time));
+};

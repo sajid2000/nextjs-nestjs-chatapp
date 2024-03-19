@@ -22,9 +22,10 @@ import { GroupService } from "./services/group.service";
 import { MessageService } from "./services/message.service";
 import { MESSAGE_STATUS, MessageResponsePayload } from "./types";
 import {
+  createConversationSchema,
   groupConversationCreatedRequestSchema,
   joinConversationRequestSchema,
-  privateConversationCreatedRequestSchema,
+  kickGroupMemberRequestSchema,
 } from "./validators/conversation.validator";
 import {
   messageDeliveredRequestSchema,
@@ -57,12 +58,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.userService.update(user.id, { isOnline: true });
 
       const userConversations = await this.conversationService.getAllConversationsIdOfUser(user.id);
-      const conversationIds = userConversations.map((i) => `conversation:${i.conversationId}`);
+      const userGroups = await this.groupService.getAllGroupOfUser(user.id);
 
-      client.join(conversationIds);
+      const privateConversationsId = userConversations.map((i) => `conversation:${i.conversationId}`);
+      const groupConversationsId = userGroups.map((i) => `conversation:${i.group.conversationId}`);
+
+      const roomsId = privateConversationsId.concat(groupConversationsId);
+
+      client.join(roomsId);
       client.join(`user:${user.id}`);
 
-      client.to(conversationIds).emit("userConnected", {
+      client.to(roomsId).emit("userConnected", {
         userId: user.id,
         name: user.fullName,
         phone: user.phone,
@@ -87,9 +93,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const updatedUser = await this.userService.update(user.id, { isOnline: false, lastSeen: new Date() });
 
       const userConversations = await this.conversationService.getAllConversationsIdOfUser(user.id);
-      const conversationIds = userConversations.map((i) => `conversation:${i.conversationId}`);
+      const conversationsId = userConversations.map((i) => `conversation:${i.conversationId}`);
 
-      client.to(conversationIds).emit("userDisconnected", {
+      client.to(conversationsId).emit("userDisconnected", {
         userId: user.id,
         lastSeen: updatedUser.lastSeen,
       });
@@ -98,33 +104,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage("privateConversationCreated")
-  async handlePrivateConversationCreated(client: Socket, payload: any) {
-    const validate = privateConversationCreatedRequestSchema.safeParse(payload);
+  @SubscribeMessage("createPrivateConversation")
+  async handleCreatePrivateConversation(client: Socket, payload: any) {
+    const validate = createConversationSchema.safeParse(payload);
 
     if (!validate.success) {
       throw new WsException({ message: "Validation failed!", fields: validate.error.flatten().fieldErrors });
     }
 
     const user = client.request.user;
-    const { conversationId } = validate.data;
+    const { contactId } = validate.data;
 
-    // find or create conversation
-    const userConversation = await this.conversationService.getConversationWithDetails({ userId: user.id, conversationId });
-    const participant = await this.conversationService.getPrivateConversationParticipantOfUser({
+    const conversation = await this.conversationService.createPrivateConversation({ contactId, userId: user.id });
+    const userConversation = await this.conversationService.getConversationWithDetails({
       userId: user.id,
-      conversationId,
+      conversationId: conversation.id,
     });
     const participantConversaton = await this.conversationService.getConversationWithDetails({
-      userId: participant.id,
-      conversationId,
+      userId: contactId,
+      conversationId: conversation.id,
     });
-
-    if (userConversation.isGroup) throw new WsException({ message: "Conversaton not found" });
 
     // emit newConversation event to both user.
     this.server.to(`user:${user.id}`).emit("newConversation", userConversation);
-    this.server.to(`user:${participant.id}`).emit("newConversation", participantConversaton);
+    this.server.to(`user:${contactId}`).emit("newConversation", participantConversaton);
   }
 
   @SubscribeMessage("groupConversationCreated")
@@ -136,13 +139,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const user = client.request.user;
-    const { conversationId, groupId } = validate.data;
+    const { conversationId } = validate.data;
 
     // find or create conversation
     const conversation = await this.conversationService.getConversationWithDetails({ userId: user.id, conversationId });
 
-    if (conversation.id !== groupId || !conversation.isGroup)
-      throw new WsException({ message: "Conversation group not matched" });
+    if (!conversation.isGroup) throw new WsException({ message: "Conversation group not matched" });
 
     const groupMembers = await this.groupService.getAllMembersOfGroup(conversation.participantOrGroupId);
 
@@ -163,27 +165,78 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.join(`conversation:${conversationId}`);
   }
 
+  @SubscribeMessage("leaveConversation")
+  async handleLeaveConversation(client: Socket, payload: any) {
+    const user = client.request.user;
+    const validate = joinConversationRequestSchema.safeParse(payload);
+
+    if (!validate.success) {
+      throw new WsException({ message: "Validation failed!", fields: validate.error.flatten().fieldErrors });
+    }
+
+    const { conversationId } = validate.data;
+
+    try {
+      const conversation = await this.conversationService.getConversationWithDetails({ conversationId, userId: user.id });
+
+      if (conversation.isGroup) {
+        const group = await this.groupService.getByConversationId(conversationId);
+
+        await this.groupService.remvoeGroupMember({ groupId: group.id, userId: user.id });
+
+        await this.conversationService.removeUserConversation({ conversationId, userId: user.id });
+      } else {
+        await this.conversationService.softDeleteUserConversation({ conversationId, userId: user.id });
+      }
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        throw error;
+      }
+    }
+
+    client.leave(`conversation:${conversationId}`);
+  }
+
+  @SubscribeMessage("kickGroupMember")
+  async handleKickGroupMember(client: Socket, payload: any) {
+    const user = client.request.user;
+    const validate = kickGroupMemberRequestSchema.safeParse(payload);
+
+    if (!validate.success) {
+      throw new WsException({ message: "Validation failed!", fields: validate.error.flatten().fieldErrors });
+    }
+
+    const { memberId, conversationId } = validate.data;
+
+    await this.conversationService.bannGroupMember(user.id, { memberId, conversationId });
+
+    this.server.to(`user:${memberId}`).emit("bannedFromGroup", { conversationId });
+  }
+
   @SubscribeMessage("messageSend")
   async handleMessage(client: Socket, payload: any) {
+    const user = client.request.user;
     const validate = messageSendRequestSchema.safeParse(payload);
 
     if (!validate.success) {
       throw new WsException({ message: "Validation failed!", fields: validate.error.flatten().fieldErrors });
     }
 
-    const user = client.request.user;
-
     const { conversationId, messageContent, messageType } = validate.data;
 
-    // find conversation, if already exists with receiver.
-    const conversation = await this.conversationService.getConversationOfUser({
-      userId: user.id,
+    const participant = await this.conversationService.getPrivateConversationParticipant({ conversationId, userId: user.id });
+    const isMember = await this.conversationService.isMemberOfConversation({
+      userId: participant.id,
       conversationId: conversationId,
     });
 
+    if (!isMember) {
+      await this.conversationService.createPrivateConversation({ userId: participant.id, contactId: user.id });
+    }
+
     // save message in db.
     const message = await this.messageService.saveMessage({
-      conversationId: conversation.id,
+      conversationId: conversationId,
       senderId: user.id,
       messageContent,
       messageType: messageType,
@@ -198,7 +251,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         messageType,
       },
       conversation: {
-        id: conversation.id,
+        id: conversationId,
         isGroup: false,
       },
       sender: {
@@ -209,7 +262,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
 
     // emit an event to subscribed user.
-    this.server.to(`conversation:${conversation.id}`).emit("messageReceived", newChatMessage);
+    this.server.to(`conversation:${conversationId}`).emit("messageReceived", newChatMessage);
   }
 
   @SubscribeMessage("messageDelivered")
@@ -253,12 +306,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const { conversationId } = validate.data;
 
-    try {
-      await this.conversationService.getConversationOfUser({ userId: senderId, conversationId });
-
+    if (await this.conversationService.isMemberOfConversation({ userId: senderId, conversationId })) {
       client.to(`conversation:${conversationId}`).emit("messageTypingStart", { conversationId });
-    } catch (error) {
-      //
     }
   }
 
@@ -273,12 +322,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const { conversationId } = validate.data;
 
-    try {
-      await this.conversationService.getConversationOfUser({ userId: senderId, conversationId });
-
+    if (await this.conversationService.isMemberOfConversation({ userId: senderId, conversationId })) {
       client.to(`conversation:${conversationId}`).emit("messageTypingStop", { conversationId });
-    } catch (error) {
-      //
     }
   }
 

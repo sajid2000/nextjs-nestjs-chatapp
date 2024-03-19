@@ -6,9 +6,10 @@ import { useState } from "react";
 import CreateContact from "@/components/chat/conversation/CreateContact";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ApplicationError } from "@/lib/errors";
 import { socket } from "@/lib/socket";
 import { useContactList } from "@/services/contactService";
-import { useCreateConversation } from "@/services/conversationService";
+import { usePrivateConversationByContact } from "@/services/conversationService";
 
 type Props = {
   trigger: React.ReactNode;
@@ -19,17 +20,19 @@ const CreateConversation: React.FC<Props> = ({ trigger }) => {
   const [open, setOpen] = useState(false);
 
   const { data } = useContactList();
-  const { mutateAsync: startConversation } = useCreateConversation();
+  const { mutateAsync: getPrivateConversationByContact } = usePrivateConversationByContact();
 
   const handleStartConversation = async (contactId: number) => {
     try {
-      const res = await startConversation({ contactId, isGroup: false });
+      const exist = await getPrivateConversationByContact(contactId);
 
-      if (res.data.id) {
-        socket.volatile.emit("privateConversationCreated", { contactId, conversationId: res.data.id });
-      }
+      router.push(`/?conversation=${exist.data.id}`);
     } catch (error) {
-      console.log(error);
+      if (error instanceof ApplicationError && error.statusCode === 404) {
+        socket.volatile.emit("createPrivateConversation", { contactId });
+      }
+    } finally {
+      setOpen(false);
     }
   };
 

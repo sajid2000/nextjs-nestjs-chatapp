@@ -1,25 +1,37 @@
 import { MoreVerticalIcon, Trash2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAlert } from "@/contexts/AlertProvider";
+import { socket } from "@/lib/socket";
 import { useContactInfo } from "@/services/contactService";
-import { useLeaveConversation } from "@/services/conversationService";
+import { invalidateConversationList } from "@/services/conversationService";
 
 import Loading from "../Loading";
 
 type Props = {
   contactId: number;
+  conversationId: number;
 };
 
-const ContactInfo: React.FC<Props> = ({ contactId }) => {
+const ContactInfo: React.FC<Props> = ({ conversationId, contactId }) => {
+  const router = useRouter();
+
   const { showAlert } = useAlert();
   const [open, setOpen] = useState(false);
 
   const { data, isLoading } = useContactInfo(contactId);
-  const { mutateAsync: leaveConversation } = useLeaveConversation();
+
+  const leaveConversation = () => {
+    socket.volatile.emit("leaveConversation", { conversationId });
+
+    router.replace("/");
+
+    invalidateConversationList();
+  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -52,8 +64,10 @@ const ContactInfo: React.FC<Props> = ({ contactId }) => {
                   onClick={() => {
                     showAlert({
                       actionLabel: "Delete",
-                      action: () => leaveConversation(data.id),
+                      action: async () => leaveConversation(),
                     });
+
+                    router.replace("/");
                   }}
                 >
                   <Trash2Icon className="size-5" /> Delete Conversatoin

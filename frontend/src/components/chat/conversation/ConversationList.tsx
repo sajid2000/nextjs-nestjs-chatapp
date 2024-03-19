@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { ServerToClientEvents, socket } from "@/lib/socket";
@@ -12,10 +12,11 @@ import ConversationListSkeleton from "./ConversationListSkeleton";
 import CreateGroupConversation from "./CreateGroupConversation";
 
 export default function ConversationList() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const conversationId = parseInt(searchParams.get("conversation") ?? "");
 
-  const [conversationList, setConversationList] = useState<ConversationThread[]>([]);
+  const [conversationList, setConversationList] = useState<(ConversationThread & { isTyping?: boolean })[]>([]);
 
   const { data, isLoading } = useThreadListQuery();
 
@@ -35,13 +36,36 @@ export default function ConversationList() {
     setConversationList((v) => {
       const updatedConversation = v.find((i) => i.id === conversation.id);
 
-      if (!updatedConversation) return v;
+      if (!updatedConversation) {
+        return [
+          {
+            ...conversation,
+            avatar: sender.avatar,
+            name: sender.fullName,
+            isOnline: true,
+            lastSeen: new Date(),
+            participantOrGroupId: sender.id,
+            lastMessage: { ...message, senderId: sender.id },
+          },
+          ...v,
+        ];
+      }
 
       return [
         { ...updatedConversation, lastMessage: { ...message, senderId: sender.id } },
         ...v.filter((i) => i.id !== updatedConversation.id),
       ];
     });
+  }, []);
+
+  const onBannedFromGroup: ServerToClientEvents["bannedFromGroup"] = useCallback((payload) => {
+    const { conversationId } = payload;
+
+    socket.volatile.emit("leaveConversation", { conversationId });
+
+    setConversationList((v) => v.filter((i) => i.id !== conversationId));
+
+    router.replace("/");
   }, []);
 
   const onUserConnected: ServerToClientEvents["userConnected"] = useCallback((payload) => {
@@ -66,6 +90,18 @@ export default function ConversationList() {
     });
   }, []);
 
+  const onMessageTypingStart: ServerToClientEvents["messageTypingStart"] = useCallback(({ conversationId }) => {
+    setConversationList((v) => {
+      return v.map((i) => (i.id !== conversationId ? i : { ...i, isTyping: true }));
+    });
+  }, []);
+
+  const onMessageTypingStop: ServerToClientEvents["messageTypingStop"] = useCallback(({ conversationId }) => {
+    setConversationList((v) => {
+      return v.map((i) => (i.id !== conversationId ? i : { ...i, isTyping: false }));
+    });
+  }, []);
+
   useEffect(() => {
     if (isLoading) return;
 
@@ -74,17 +110,31 @@ export default function ConversationList() {
 
   useEffect(() => {
     socket.on("newConversation", onNewConversation);
+    socket.on("bannedFromGroup", onBannedFromGroup);
     socket.on("messageReceived", onMessageReceived);
     socket.on("userConnected", onUserConnected);
     socket.on("userDisconnected", onUserDisconnected);
+    socket.on("messageTypingStart", onMessageTypingStart);
+    socket.on("messageTypingStop", onMessageTypingStop);
 
     return () => {
       socket.off("newConversation", onNewConversation);
+      socket.off("bannedFromGroup", onBannedFromGroup);
       socket.off("messageReceived", onMessageReceived);
       socket.off("userConnected", onUserConnected);
       socket.off("userDisconnected", onUserDisconnected);
+      socket.off("messageTypingStart", onMessageTypingStart);
+      socket.off("messageTypingStop", onMessageTypingStop);
     };
-  }, [onNewConversation, onMessageReceived, onUserConnected, onUserDisconnected]);
+  }, [
+    onNewConversation,
+    onBannedFromGroup,
+    onMessageReceived,
+    onUserConnected,
+    onUserDisconnected,
+    onMessageTypingStart,
+    onMessageTypingStop,
+  ]);
 
   if (isLoading) return <ConversationListSkeleton />;
 

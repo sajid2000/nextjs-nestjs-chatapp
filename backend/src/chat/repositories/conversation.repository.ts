@@ -46,7 +46,7 @@ export class ConversationRepository {
     const uc = alias(dbTable.userConversation, "uc");
 
     const result = await this.db.execute(sql`select
-      ${c.id}, ${c.isGroup} as "isGroup",
+      ${c.id}, ${c.isGroup}, ${c.createdAt}, ${c.updatedAt},
       ${u.id} as "participantId", ${u.fullName} as "name" , ${u.avatar}, ${u.lastSeen} as "lastSeen", ${u.isOnline} as "isOnline",
       ${m.id} as "lastMessageId", ${m.messageContent} as "lastMessageContent",
       ${m.senderId} as "lastMessageSenderId" , ${m.messageType} as "lastMessageType",
@@ -75,7 +75,7 @@ export class ConversationRepository {
     });
   }
 
-  async getConversationOfUser({ conversationId, userId }: UserConversationFilter) {
+  async findOneConversationByUser({ conversationId, userId }: UserConversationFilter) {
     const data = await this.db.query.userConversation.findFirst({
       where: and(eq(dbTable.userConversation.userId, userId), eq(dbTable.userConversation.conversationId, conversationId)),
       columns: { isDeleted: true },
@@ -87,7 +87,13 @@ export class ConversationRepository {
     return data ? { ...data.conversation, isDeleted: data.isDeleted } : undefined;
   }
 
-  async getPrivateConversationParticipantOfUser({ conversationId, userId }: UserConversationFilter) {
+  async findUserConversation({ conversationId, userId }: UserConversationFilter) {
+    return this.db.query.userConversation.findFirst({
+      where: and(eq(dbTable.userConversation.userId, userId), eq(dbTable.userConversation.conversationId, conversationId)),
+    });
+  }
+
+  async getPrivateConversationParticipant({ conversationId, userId }: UserConversationFilter) {
     const res = await this.db.query.userConversation.findFirst({
       where: and(not(eq(dbTable.userConversation.userId, userId)), eq(dbTable.userConversation.conversationId, conversationId)),
       columns: {},
@@ -134,6 +140,8 @@ export class ConversationRepository {
     const ids = await this.getAllConversationsIdOfUser(userId);
     const conversationsId = ids.filter((i) => !i.isDeleted).map((i) => i.conversationId);
 
+    if (conversationsId.length === 0) return [];
+
     const data = await this.db.query.group.findMany({
       where: inArray(dbTable.group.conversationId, conversationsId),
       columns: {
@@ -178,8 +186,19 @@ export class ConversationRepository {
     await this.db.insert(dbTable.userConversation).values(userIds.map((i) => ({ conversationId, userId: i })));
   }
 
-  async updateUserConversation(conversationId: number, data: { isDeleted: boolean }) {
-    await this.db.update(dbTable.userConversation).set(data).where(eq(dbTable.userConversation.conversationId, conversationId));
+  async updateUserConversation(data: { conversationId: number; userId: number; isDeleted: boolean }) {
+    await this.db
+      .update(dbTable.userConversation)
+      .set(data)
+      .where(
+        and(eq(dbTable.userConversation.conversationId, data.conversationId), eq(dbTable.userConversation.userId, data.userId))
+      );
+  }
+
+  async removeUserConversation({ conversationId, userId }: UserConversationFilter) {
+    await this.db
+      .delete(dbTable.userConversation)
+      .where(and(eq(dbTable.userConversation.userId, userId), eq(dbTable.userConversation.conversationId, conversationId)));
   }
 
   async removeConversation(conversationId: number) {

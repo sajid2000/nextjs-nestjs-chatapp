@@ -7,8 +7,8 @@ import { GroupRepository } from "../repositories/group.repository";
 export class GroupService {
   constructor(private readonly groupRepository: GroupRepository) {}
 
-  async getById(groupId: number) {
-    const res = await this.groupRepository.getAllMembersOfGroup(groupId);
+  async getByConversationId(conversationId: number) {
+    const res = await this.groupRepository.findByConversationId(conversationId);
 
     if (!res) throw new NotFoundException();
 
@@ -17,6 +17,22 @@ export class GroupService {
 
   async getAllMembersOfGroup(groupId: number) {
     return this.groupRepository.getAllMembersOfGroup(groupId);
+  }
+
+  async getAllGroupOfUser(userId: number) {
+    return this.groupRepository.getAllGroupOfUser(userId);
+  }
+
+  async isGroupMember(dto: { groupId: number; userId: number }) {
+    const groupMember = await this.groupRepository.findGroupMember(dto);
+
+    if (!groupMember) return false;
+
+    return true;
+  }
+
+  async remvoeGroupMember(dto: { groupId: number; userId: number }) {
+    await this.groupRepository.removeGroupMemeber(dto);
   }
 
   async update(userId: number, dto: Partial<CreateGroupDto> & { groupId: number }) {
@@ -33,15 +49,5 @@ export class GroupService {
     }
 
     return this.groupRepository.updateAndRetrive(groupId, { name: name ?? undefined, image: image ?? undefined });
-  }
-
-  async remove({ userId, groupId }: { userId: number; groupId: number }) {
-    const exists = await this.groupRepository.findById(groupId);
-
-    if (!exists) throw new NotFoundException();
-
-    if (exists.creator !== userId) throw new ForbiddenException();
-
-    return this.groupRepository.delete(groupId);
   }
 }

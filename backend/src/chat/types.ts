@@ -11,6 +11,8 @@ export interface Thread {
   avatar: string | null;
   lastSeen: Date;
   isOnline: boolean;
+  createdAt: Date;
+  updatedAt: Date;
   lastMessageId: number;
   lastMessageContent: string;
   lastMessageSenderId: number;
